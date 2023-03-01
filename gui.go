@@ -18,7 +18,8 @@ type ControlCenterPanel struct {
 	vol                        binding.Float
 }
 
-func newControlCenterPanel(w f2.Window, ps *playerState) *ControlCenterPanel {
+func newControlCenterPanelGUI(w f2.Window, mpc *MpcClient) *ControlCenterPanel {
+
 	c := new(ControlCenterPanel)
 	fg := theme.ForegroundColor()
 
@@ -31,7 +32,7 @@ func newControlCenterPanel(w f2.Window, ps *playerState) *ControlCenterPanel {
 	c.time = canvas.NewText("Time:", fg)
 	c.time.TextSize = 12
 
-	c.updateTrackDetails()
+	c.updateTrackDetails(mpc.ps.track)
 
 	// c.statusL = widget.NewLabel("ready")
 	c.statusL = canvas.NewText("Ready", fg)
@@ -54,7 +55,7 @@ func newControlCenterPanel(w f2.Window, ps *playerState) *ControlCenterPanel {
 	sl.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
 	sl.Move(f2.NewPos(0, 20))
 
-	lastVol, _ := getVolume()
+	// lastVol := ps.volume
 	volLastChngd := time.Now()
 
 	// volume slider
@@ -65,22 +66,16 @@ func newControlCenterPanel(w f2.Window, ps *playerState) *ControlCenterPanel {
 		if elapsed > 100 {
 			volLastChngd = time.Now()
 			v := int(val)
-			// sendCtrlCmd(mpdSrv, "setvol "+fmt.Sprintf("%d", v))
+			mpc.sendCtrlCmd("setvol " + fmt.Sprintf("%d", v))
 		}
 	}
 
-	vol, err := getVolume()
-	if err == nil {
-		c.vol.Set(float64(vol))
-	}
+	c.vol.Set(float64(mpc.ps.volume))
 
 	prgrs := widget.NewProgressBar()
-	trlen, err := getTrackLen()
-	if err == nil {
-		prgrs.Min = 0
-		prgrs.Max = float64(trlen)
-		fmt.Println("trlen=", trlen)
-	}
+	trlen := mpc.ps.track.duration
+	prgrs.Min = 0
+	prgrs.Max = float64(trlen)
 
 	con := container.NewBorder(
 		nil,
@@ -91,28 +86,13 @@ func newControlCenterPanel(w f2.Window, ps *playerState) *ControlCenterPanel {
 			c.artist, c.album, c.track, c.time, prgrs, widget.NewSeparator(),
 			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			container.NewGridWithColumns(5,
-				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { sendCtrlCmd(mpdSrv, "previous") }),
-				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { sendCtrlCmd(mpdSrv, "play") }),
-				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { sendCtrlCmd(mpdSrv, "pause") }),
-				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { sendCtrlCmd(mpdSrv, "stop") }),
-				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { sendCtrlCmd(mpdSrv, "next") })),
+				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { mpc.sendCtrlCmd("previous") }),
+				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { mpc.sendCtrlCmd("play") }),
+				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { mpc.sendCtrlCmd("pause") }),
+				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { mpc.sendCtrlCmd("stop") }),
+				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { mpc.sendCtrlCmd("next") })),
 			bPower, bShtDn),
 	)
-
-	// con := container.NewVBox(container.NewHBox(container.NewVBox(
-	// 	c.artist, c.album, c.track, widget.NewSeparator(),
-	// 	container.NewGridWithColumns(2, b1, b2),
-	// 	container.NewGridWithColumns(5,
-	// 		widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { sendCtrlCmd(mpdSrv, "prev") }),
-	// 		widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { sendCtrlCmd(mpdSrv, "play") }),
-	// 		widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { sendCtrlCmd(mpdSrv, "pause") }),
-	// 		widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { sendCtrlCmd(mpdSrv, "stop") }),
-	// 		widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { sendCtrlCmd(mpdSrv, "next") })),
-	// 	bPower,
-	// ), sl),
-	// 	widget.NewSeparator(),
-	// 	c.statusL,
-	// )
 
 	w.SetContent(con)
 

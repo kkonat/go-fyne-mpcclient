@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -12,26 +13,37 @@ import (
 	"golang.org/x/net/context"
 )
 
-type PlayerStatus int
+type TrackInfo struct {
+	album    string
+	artist   string
+	track    string
+	duration TrackTime
+	hash     uint32
+}
+type TrackTime int64
+type TrackVolume int64
+
+type PlayStatus int
 
 const (
-	paused PlayerStatus = iota
+	paused PlayStatus = iota
 	playing
 	stopped
 )
 
 type playerState struct {
-	status  PlayerStatus
+	status  PlayStatus
 	track   TrackInfo
 	volume  TrackVolume
 	elapsed TrackTime
 }
 
 type MpcClient struct {
-	serverAddr string
-	ctx        context.Context
-	updateCh   chan any
-	ps         playerState
+	mpdServerAddr string
+	ctrlSrvAddr   string
+	ctx           context.Context
+	updateStream  chan any
+	ps            playerState
 }
 
 func (mpcc *MpcClient) Update() {
@@ -46,7 +58,7 @@ func (mpcc *MpcClient) Update() {
 	track := tryExtractString(resp, "Track:", "")
 	title := tryExtractString(resp, "Title", "")
 	trackTitle := track + " - " + title
-	dur := tryExtractInt(resp, "Time:", 0)
+	dur := TrackTime(tryExtractInt(resp, "Time:", int64(mpcc.ps.track.duration)))
 
 	mpcc.ps.track = TrackInfo{
 		album:    album,
@@ -55,10 +67,11 @@ func (mpcc *MpcClient) Update() {
 		duration: dur,
 	}
 
+	log.Printf("%+v\n", mpcc.ps.track)
 	newHash := calcHash([]string{album, artist, trackTitle})
 	if mpcc.ps.track.hash != newHash {
 		mpcc.ps.track.hash = newHash
-		mpcc.updateCh <- mpcc.ps.track
+		mpcc.updateStream <- mpcc.ps.track
 	}
 
 	resp, err = mpcc.sendCtrlCmd("stauts")
@@ -68,34 +81,34 @@ func (mpcc *MpcClient) Update() {
 	vol := TrackVolume(tryExtractInt(resp, "volume:", int64(mpcc.ps.volume)))
 	if mpcc.ps.volume != vol {
 		mpcc.ps.volume = vol
-		mpcc.updateCh <- TrackVolume(vol)
+		mpcc.updateStream <- TrackVolume(vol)
 	}
 
 	elpsd := TrackTime(tryExtractInt(resp, "elapsed:", int64(mpcc.ps.elapsed)))
 	if mpcc.ps.elapsed != elpsd {
 		mpcc.ps.elapsed = elpsd
-		mpcc.updateCh <- TrackTime(elpsd)
+		mpcc.updateStream <- TrackTime(elpsd)
 	}
-
 }
 
 func (mpcc *MpcClient) sendCtrlCmd(cmd string) ([]string, error) {
-	conn, err := net.Dial("tcp", mpcc.serverAddr)
+	conn, err := net.Dial("tcp", mpcc.mpdServerAddr)
 	var resp []string
 	if err != nil {
-		return nil, errors.New("Error connecting to host")
+		return nil, errors.New("error connecting to host")
 	}
 	defer conn.Close()
 
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
-
-		if scanner.Text() == "OK" {
+		if scanner.Text()[:2] == "OK" {
 			break
 		} else {
+			log.Printf("RESP: %s", scanner.Text())
 			resp = append(resp, scanner.Text())
 		}
 	}
+
 	return resp, nil
 }
 
