@@ -24,7 +24,7 @@ type ControlCenterPanelGUI struct {
 	prgrs                *widget.ProgressBar
 }
 
-func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenterPanelGUI {
+func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPanelGUI {
 
 	c := new(ControlCenterPanelGUI)
 
@@ -32,7 +32,7 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 	c.album = fe.NewText("Album:", 12)
 	c.track = fe.NewText("Trk:", 12)
 
-	c.updateTrackDetails(&mpc.state.track)
+	c.updateTrackDetails(&app.state.track)
 
 	c.statusL = fe.NewText("Ready", 10)
 
@@ -43,12 +43,12 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.StatusText("switched to Player")
-		mpc.ctrlClient.Req("deq_input_coaxial")
+		app.ctrlClient.Req("deq_input_coaxial")
 	})
 
 	bInputTV := widget.NewButton("TV", func() {
 		c.StatusText("switched to TV")
-		mpc.ctrlClient.Req("deq_input_optical")
+		app.ctrlClient.Req("deq_input_optical")
 	})
 
 	bPower := widget.NewButton("Power", c.tapPower)
@@ -58,7 +58,7 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 	sl.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
 	sl.Move(f2.NewPos(0, 20))
 
-	c.lastVol = mpc.state.volume
+	c.lastVol = app.state.volume
 	c.volLastChngd = time.Now()
 
 	// volume slider
@@ -69,14 +69,14 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 		if elapsed > 100 {
 			c.volLastChngd = time.Now()
 			v := int(val)
-			mpc.mpdClient.Req(fmt.Sprintf("setvol %d", v))
+			app.mpdClient.Req(fmt.Sprintf("setvol %d", v))
 		}
 	}
 
-	c.vol.Set(float64(mpc.state.volume))
+	c.vol.Set(float64(app.state.volume))
 
 	c.prgrs = widget.NewProgressBarWithData(c.elapsed)
-	c.prgrs.Max = float64(mpc.state.track.duration)
+	c.prgrs.Max = float64(app.state.track.duration)
 	c.prgrs.TextFormatter = func() string {
 		return trkTimeToString(float32(c.prgrs.Value))
 	}
@@ -90,11 +90,11 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 			c.artist, c.album, c.track, c.prgrs, widget.NewSeparator(),
 			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			container.NewGridWithColumns(5,
-				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { mpc.mpdClient.Req("previous") }),
-				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { mpc.mpdClient.Req("play") }),
-				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { mpc.mpdClient.Req("pause") }),
-				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { mpc.mpdClient.Req("stop") }),
-				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { mpc.mpdClient.Req("next") })),
+				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { app.mpdClient.Req("previous") }),
+				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { app.mpdClient.Req("play") }),
+				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { app.mpdClient.Req("pause") }),
+				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { app.mpdClient.Req("stop") }),
+				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { app.mpdClient.Req("next") })),
 			bPower, bShtDn),
 	)
 

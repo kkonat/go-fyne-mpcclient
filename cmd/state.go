@@ -3,10 +3,8 @@ package main
 import (
 	"fmt"
 	"hash/crc32"
-	"log"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type TrackInfo struct {
@@ -33,48 +31,17 @@ type playerState struct {
 	volume  TrackVolume
 	elapsed TrackTime
 
-	stateChange chan any
+	stateChange *chan any
 	app         *ControlCenterApp
 }
 
-func NewState(app *ControlCenterApp) *playerState {
+func NewState(app *ControlCenterApp, stateChange *chan any) *playerState {
 	return &playerState{
-		stateChange: make(chan any),
+		stateChange: stateChange,
 		app:         app,
 	}
 }
-func (ps *playerState) monitor(gui *ControlCenterPanelGUI) {
-	updateTrk := time.Tick(time.Millisecond * 500)
-	updateStatus := time.Tick(time.Millisecond * 100)
-loop:
-	for {
-		select {
-		case what := <-ps.stateChange:
-			switch newValue := what.(type) {
-			case TrackInfo:
-				log.Printf("update track info: %v", newValue)
-				gui.updateTrackDetails(&newValue)
-			case TrackVolume:
-				log.Printf("updae track volume: %v", newValue)
-				gui.updateVolume(newValue)
-			case PlayStatus:
-				log.Printf("updae play status: %v", newValue)
-				// TODO update player status
-			case TrackTime:
-				// log.Printf("updae track time elapsed: %v", newValue)
-				gui.updateTrackElapsedTime(newValue)
-			}
-		case <-updateTrk:
-			go ps.getTrkData()
 
-		case <-updateStatus:
-			go ps.getStatus()
-
-		case <-ps.app.ctx.Done():
-			break loop
-		}
-	}
-}
 func (ps *playerState) getTrkData() {
 
 	resp := ps.app.mpdClient.Req("currentsong")
@@ -100,7 +67,7 @@ func (ps *playerState) getTrkData() {
 		hash:     newHash,
 	}
 	if oldHash != newHash {
-		ps.stateChange <- ps.track
+		*(ps.stateChange) <- ps.track
 	}
 }
 func (ps *playerState) getStatus() {
@@ -111,13 +78,13 @@ func (ps *playerState) getStatus() {
 	vol := TrackVolume(tryExtractInt(resp, "volume:", int64(ps.volume)))
 	if ps.volume != vol {
 		ps.volume = vol
-		ps.stateChange <- TrackVolume(vol)
+		*(ps.stateChange) <- TrackVolume(vol)
 	}
 
 	elpsd := TrackTime(tryExtractFloat(resp, "elapsed:", float64(ps.elapsed)))
 	if int(ps.elapsed) != int(elpsd) {
 		ps.elapsed = elpsd
-		ps.stateChange <- TrackTime(elpsd)
+		*(ps.stateChange) <- TrackTime(elpsd)
 	}
 }
 

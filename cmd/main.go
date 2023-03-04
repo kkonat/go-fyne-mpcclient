@@ -8,19 +8,17 @@ import (
 )
 
 func main() {
-	fyneApp := app.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	updateStream := make(chan any, 10)
-
-	ccApp := NewControlCenterApp(ctx, updateStream)
-
+	fyneApp := app.New()
+	ccApp := NewControlCenterApp(ctx)
 	window := fyneApp.NewWindow("Remote Control Center")
-	ccGui := newControlCenterPanelGUI(window, ccApp)
+	ccGui := newControlCenterAppGUI(window, ccApp)
 
-	go ccApp.state.monitor(ccGui)
+	go ccApp.refreshState()
+	go ccApp.updateGUI(ccGui)
 
 	window.ShowAndRun()
 
