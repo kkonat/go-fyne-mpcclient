@@ -8,9 +8,7 @@ import (
 )
 
 func main() {
-
-	a := app.New()
-	window := a.NewWindow("Remote Control Center")
+	fyneApp := app.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -19,9 +17,10 @@ func main() {
 
 	ccApp := NewControlCenterApp(ctx, updateStream)
 
+	window := fyneApp.NewWindow("Remote Control Center")
 	ccGui := newControlCenterPanelGUI(window, ccApp)
 
-	go ccApp.monitorState(ccGui)
+	go ccApp.state.monitor(ccGui)
 
 	window.ShowAndRun()
 

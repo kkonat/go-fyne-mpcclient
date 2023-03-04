@@ -43,12 +43,12 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.StatusText("switched to Player")
-		mpc.ctrlClient.ask("deq_input_coaxial")
+		mpc.ctrlClient.Req("deq_input_coaxial")
 	})
 
 	bInputTV := widget.NewButton("TV", func() {
 		c.StatusText("switched to TV")
-		mpc.ctrlClient.ask("deq_input_optical")
+		mpc.ctrlClient.Req("deq_input_optical")
 	})
 
 	bPower := widget.NewButton("Power", c.tapPower)
@@ -69,7 +69,7 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 		if elapsed > 100 {
 			c.volLastChngd = time.Now()
 			v := int(val)
-			mpc.mpdClient.ask(fmt.Sprintf("setvol %d", v))
+			mpc.mpdClient.Req(fmt.Sprintf("setvol %d", v))
 		}
 	}
 
@@ -90,11 +90,11 @@ func newControlCenterPanelGUI(w f2.Window, mpc *ControlCenterApp) *ControlCenter
 			c.artist, c.album, c.track, c.prgrs, widget.NewSeparator(),
 			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			container.NewGridWithColumns(5,
-				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { mpc.mpdClient.ask("previous") }),
-				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { mpc.mpdClient.ask("play") }),
-				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { mpc.mpdClient.ask("pause") }),
-				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { mpc.mpdClient.ask("stop") }),
-				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { mpc.mpdClient.ask("next") })),
+				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() { mpc.mpdClient.Req("previous") }),
+				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() { mpc.mpdClient.Req("play") }),
+				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() { mpc.mpdClient.Req("pause") }),
+				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() { mpc.mpdClient.Req("stop") }),
+				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() { mpc.mpdClient.Req("next") })),
 			bPower, bShtDn),
 	)
 

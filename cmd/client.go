@@ -2,40 +2,50 @@ package main
 
 import (
 	"bufio"
-	"fmt"
-	"hash/crc32"
 	"net"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
 
 type Client struct {
-	serverAddr  string
-	mtx         *sync.Mutex
-	eventStream chan any
+	serverAddr string
+	mtx        *sync.Mutex
+	conn       net.Conn
 }
 
 func NewClient(addr string) *Client {
-	clnt := &Client{serverAddr: addr, mtx: &sync.Mutex{}, eventStream: make(chan any)}
-
+	clnt := &Client{serverAddr: addr, mtx: &sync.Mutex{}}
+	clnt.attemptReconnect()
 	return clnt
 }
 
-func (s *Client) ask(cmd string) []string {
+func (s *Client) attemptReconnect() net.Conn {
+	if s.conn == nil {
+		conn, err := net.DialTimeout("tcp", s.serverAddr, time.Millisecond*200)
+		if err == nil {
+			s.conn = conn
+		}
+	}
+	return s.conn
+}
+
+func (s *Client) Req(cmd string) []string {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	conn, err := net.DialTimeout("tcp", s.serverAddr, time.Millisecond*200)
-	if err != nil {
-		return nil // , errors.New("error connecting to: " + s.serverAddr)
+	s.attemptReconnect()
+	if s.conn == nil {
+		return nil // TODO: handle more detailed error connecting to server ?
 	}
-	defer conn.Close()
 
-	fmt.Fprintln(conn, cmd) // sends command to the TCP server
+	_, err := s.conn.Write([]byte(cmd + "\n"))
+	if err != nil {
+		s.conn.Close()
+		s.conn = nil
+		return nil
+	}
 
-	scanner := bufio.NewScanner(conn)
+	scanner := bufio.NewScanner(s.conn)
 	resp := parseResponse(scanner)
 
 	return resp
@@ -56,54 +66,4 @@ func parseResponse(scanner *bufio.Scanner) []string {
 		}
 	}
 	return resp
-}
-
-func tryExtractString(data []string, key string, defaultVal string) string {
-	for _, s := range data {
-		if strings.HasPrefix(s, key) {
-			return strings.Split(s, ": ")[1]
-		}
-	}
-	return defaultVal // pass through
-}
-
-func tryExtractInt(data []string, key string, defaultVal int64) int64 {
-	vStr := tryExtractString(data, key, "")
-	if vStr != "" {
-		value, err := strconv.ParseInt(vStr, 10, 64)
-		if err == nil {
-			return value
-		}
-	}
-	return defaultVal
-}
-func tryExtractFloat(data []string, key string, defaultVal float64) float64 {
-	vStr := tryExtractString(data, key, "")
-	if vStr != "" {
-		value, err := strconv.ParseFloat(vStr, 64)
-		if err == nil {
-			return value
-		}
-	}
-	return defaultVal
-}
-
-func trkTimeToString(t float32) string {
-	str := ""
-	h := int(t) / 3600
-	t -= float32(h * 3600)
-	m := int(t) / 60
-	t -= float32(m * 60)
-	s := int(t)
-	if h > 0 {
-		str += fmt.Sprintf("%d:", h)
-	}
-	str += fmt.Sprintf("%d:%02d", m, s)
-	return str
-}
-
-func calcHash(resp []string) uint32 {
-	blob := strings.Join(resp, "")
-	crc32q := crc32.MakeTable(0xD5828281)
-	return crc32.Checksum([]byte(blob), crc32q)
 }
