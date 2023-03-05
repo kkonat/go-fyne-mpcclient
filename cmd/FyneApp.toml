@@ -1,0 +1,6 @@
+[Details]
+Icon = "cmd\Icon.png"
+Name = "Remote control center"
+ID = "github.kkonat.rccapp"
+Version = "1.0.0"
+Build = 1

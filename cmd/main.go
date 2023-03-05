@@ -1,14 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"fyne.io/fyne/v2/app"
 	"golang.org/x/net/context"
 )
 
-func main() {
+var buildDate string
 
+func main() {
+	fmt.Println("Build date: ", buildDate)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -18,8 +21,8 @@ func main() {
 	window := fyneApp.NewWindow("Remote Control Center")
 	ccGui := newControlCenterAppGUI(window, ccApp)
 
-	go ccApp.refreshState()
-	go ccApp.updateGUI(ccGui)
+	go ccApp.monitorStateChanges()
+	go ccApp.handleStateChanges(ccGui)
 
 	window.ShowAndRun()
 

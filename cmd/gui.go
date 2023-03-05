@@ -40,12 +40,12 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.setStatusText("switched to Player")
-		app.state.Request("ctrl", "deq_input_coaxial")
+		app.hw.Request("ctrl", "deq_input_coaxial")
 	})
 
 	bInputTV := widget.NewButton("TV", func() {
 		c.setStatusText("switched to TV")
-		app.state.Request("ctrl", "deq_input_optical")
+		app.hw.Request("ctrl", "deq_input_optical")
 	})
 
 	c.bPower = widget.NewButton("Power", func() {
@@ -54,7 +54,7 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 
 	bShtDn := widget.NewButton("Shutdown", func() {
 		c.setStatusText("Shutting down...")
-		app.state.Request("ctrl", "server_poweroff")
+		app.hw.Request("ctrl", "server_poweroff")
 	})
 
 	slider := widget.NewSliderWithData(0, 100, c.vol)
@@ -70,7 +70,7 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 		if time.Since(c.volLastChngd).Milliseconds() > 100 {
 			c.volLastChngd = time.Now()
 			v := int(val)
-			app.state.Request("mpd", fmt.Sprintf("setvol %d", v))
+			app.hw.Request("mpd", fmt.Sprintf("setvol %d", v))
 		}
 	}
 
@@ -90,23 +90,23 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
-					app.state.Request("mpd", "previous")
+					app.hw.Request("mpd", "previous")
 					c.setStatusText("skip back")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
-					app.state.Request("mpd", "play")
+					app.hw.Request("mpd", "play")
 					c.setStatusText("playing")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() {
-					app.state.Request("mpd", "pause")
+					app.hw.Request("mpd", "pause")
 					c.setStatusText("paused")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() {
-					app.state.Request("mpd", "stop")
+					app.hw.Request("mpd", "stop")
 					c.setStatusText("stopped")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
-					app.state.Request("mpd", "next")
+					app.hw.Request("mpd", "next")
 					c.setStatusText("skip next")
 				})),
 			c.bPower,
@@ -123,25 +123,43 @@ func (c ControlCenterPanelGUI) updatePowerBbutton(powerOn bool) {
 	} else {
 		c.bPower.SetText("Power on")
 	}
-
 }
+func (c ControlCenterPanelGUI) updateOnlineStatus(online bool, ps PlayStatus) {
+	if !online {
+		c.setStatusText("Offline. Waiting for connection...")
+	} else {
+		c.UpdatePlayStatus(ps)
+	}
+}
+
 func (c ControlCenterPanelGUI) togglePower(app *ControlCenterApp) {
 	var state bool
 	var err error
-	if state, err = app.toglleHWPower(); err == nil {
-		if state {
-			c.setStatusText("powered on")
-		} else {
-			c.setStatusText("powered off")
+	if err = app.hw.togglePower(); err == nil {
+		if state, err = app.state.getHWState(); err == nil {
+			if state {
+				c.setStatusText("powered on")
+			} else {
+				c.setStatusText("powered off")
+			}
+			c.updatePowerBbutton(state)
 		}
-		c.updatePowerBbutton(state)
 	}
 }
 func (c ControlCenterPanelGUI) setStatusText(t string) {
 	c.statusL.Text = t
 	c.statusL.Refresh()
 }
-
+func (c *ControlCenterPanelGUI) UpdatePlayStatus(s PlayStatus) {
+	switch s {
+	case playing:
+		c.setStatusText("Playing...")
+	case stopped:
+		c.setStatusText("Stopped")
+	case paused:
+		c.setStatusText("Paused")
+	}
+}
 func (c *ControlCenterPanelGUI) updateTrackDetails(ti *TrackInfo) {
 	c.album.Text = "Album: " + ti.album
 	c.artist.Text = "Artist: " + ti.artist
@@ -149,9 +167,7 @@ func (c *ControlCenterPanelGUI) updateTrackDetails(ti *TrackInfo) {
 	c.album.Refresh()
 	c.artist.Refresh()
 	c.track.Refresh()
-	// if c.prgrs != nil {
 	c.prgrs.Max = float64(ti.duration)
-	// }
 }
 
 func (c *ControlCenterPanelGUI) updateTrackElapsedTime(elTime TrackTime) {

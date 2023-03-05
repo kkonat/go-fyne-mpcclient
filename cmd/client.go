@@ -16,12 +16,12 @@ type TCPClient struct {
 	lastReconnect time.Time
 }
 
-type TCPClientParms struct {
+type TCPClientConf struct {
 	addr          string
 	singleRequest bool
 }
 
-func NewClient(params TCPClientParms) *TCPClient {
+func NewTCPClient(params TCPClientConf) *TCPClient {
 	clnt := &TCPClient{address: params.addr, mtx: &sync.Mutex{}, singleRequest: params.singleRequest}
 	if !clnt.singleRequest {
 		clnt.reconnect()

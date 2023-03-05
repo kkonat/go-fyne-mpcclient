@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"time"
 )
 
@@ -24,41 +23,35 @@ func NewControlCenterApp(ctx context.Context, hw *HWInterface) *ControlCenterApp
 	return app
 }
 
-func (a *ControlCenterApp) toglleHWPower() (bool, error) {
-	a.hw.togglePower()
-	return a.state.getHWState()
-}
-func (a *ControlCenterApp) refreshState() {
+func (a *ControlCenterApp) monitorStateChanges() {
 
 	updTrackData := time.Tick(time.Millisecond * 500)
 	updPlayerStatus := time.Tick(time.Millisecond * 85)
 	updHwStatus := time.Tick(time.Second)
-loop:
+
 	for {
 		select {
 
 		case <-updTrackData:
-			go a.state.getTrkData()
+			go a.state.getTrackData()
 
 		case <-updPlayerStatus:
-			go a.state.getStatus()
+			go a.state.getMPDStatus()
 
 		case <-updHwStatus:
 			go a.state.getHWState()
 
 		case <-a.ctx.Done():
-			break loop
+			return
 		}
 	}
 }
 
-func (a *ControlCenterApp) updateGUI(gui *ControlCenterPanelGUI) {
-
-loop:
+func (a *ControlCenterApp) handleStateChanges(gui *ControlCenterPanelGUI) {
 	for {
 		select {
-		case what := <-a.stateStream:
-			switch newValue := what.(type) {
+		case chgdState := <-a.stateStream:
+			switch newValue := chgdState.(type) {
 
 			case TrackInfo:
 				//	log.Printf("update track info: %v", newValue)
@@ -68,19 +61,21 @@ loop:
 				gui.updateVolume(newValue)
 
 			case PlayStatus:
-				log.Printf("updae play status: %v", newValue)
-				// TODO update player status
+				gui.UpdatePlayStatus(PlayStatus(newValue))
 
 			case TrackTime:
 				gui.updateTrackElapsedTime(newValue)
 
 			case PowerStatus:
-				log.Printf("power status: %v", newValue)
+				// log.Printf("power status: %v", newValue)
 				gui.updatePowerBbutton(bool(newValue))
+			case OnlineStatus:
+
+				gui.updateOnlineStatus(bool(newValue), a.state.status)
 			}
 
 		case <-a.ctx.Done():
-			break loop
+			return
 		}
 	}
 }

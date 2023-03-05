@@ -19,6 +19,7 @@ type TrackVolume int64
 
 type PlayStatus int
 type PowerStatus bool
+type OnlineStatus bool
 
 const (
 	paused PlayStatus = iota
@@ -32,6 +33,8 @@ type PlayerState struct {
 	volume  TrackVolume
 	elapsed TrackTime
 
+	online OnlineStatus
+
 	stateChange *chan any
 	hw          *HWInterface
 }
@@ -43,13 +46,9 @@ func NewPlayerState(hw *HWInterface, stateChange *chan any) *PlayerState {
 	}
 }
 
-func (ps *PlayerState) Request(server, command string) ([]string, error) {
-	return ps.hw.clients[server].Request(command)
-}
+func (ps *PlayerState) getTrackData() {
 
-func (ps *PlayerState) getTrkData() {
-
-	resp, err := ps.Request("mpd", "currentsong")
+	resp, err := ps.hw.Request("mpd", "currentsong")
 	if err != nil {
 		return
 	}
@@ -76,8 +75,8 @@ func (ps *PlayerState) getTrkData() {
 	}
 }
 
-func (ps *PlayerState) getStatus() {
-	resp, err := ps.Request("mpd", "status")
+func (ps *PlayerState) getMPDStatus() {
+	resp, err := ps.hw.Request("mpd", "status")
 	if err != nil {
 		return
 	}
@@ -92,12 +91,27 @@ func (ps *PlayerState) getStatus() {
 		ps.elapsed = elpsd
 		*(ps.stateChange) <- TrackTime(elpsd)
 	}
+
+	str := tryExtractString(resp, "state: ", "")
+	statuses := map[string]PlayStatus{"play": playing, "pause": paused, "stop": stopped}
+	if newStat, ok := statuses[str]; ok {
+		if newStat != ps.status {
+			ps.status = newStat
+			*(ps.stateChange) <- PlayStatus(newStat)
+		}
+	}
+
+	newOnlineState := ps.hw.online
+	if newOnlineState != bool(ps.online) {
+		ps.online = OnlineStatus(newOnlineState)
+		*(ps.stateChange) <- ps.online
+	}
 }
 
 func (ps *PlayerState) getHWState() (bool, error) {
 	var pwrState bool
 	var err error
-	if pwrState, err = ps.hw.chkPowerStatus(); err == nil {
+	if pwrState, err = ps.hw.chkPowerState(); err == nil {
 		if ps.hw.powerOn != pwrState {
 			*(ps.stateChange) <- PowerStatus(pwrState)
 		}
