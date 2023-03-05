@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -10,28 +12,28 @@ type ControlCenterApp struct {
 	mpdClient   *Client
 	ctrlClient  *Client
 	ctx         context.Context
-	state       *playerState
-	stateChange chan any
+	state       *PlayerState
+	stateStream chan any
 }
 
 func NewControlCenterApp(ctx context.Context) *ControlCenterApp {
 	app := &ControlCenterApp{
-		mpdClient:  NewClient("192.168.0.95:6600"),
-		ctrlClient: NewClient("192.168.0.95:1025"),
+		mpdClient:  NewClient("192.168.0.95:6600", false),
+		ctrlClient: NewClient("192.168.0.95:1025", true),
 		ctx:        ctx,
 	}
-	app.stateChange = make(chan any)
-	app.state = NewState(app, &app.stateChange)
+	app.stateStream = make(chan any)
+	app.state = NewPlayerState(app, &app.stateStream)
 
 	return app
 }
 
 func (a *ControlCenterApp) refreshState() {
-	
-	updTrackData := time.Tick(time.Millisecond * 500)
-	updPlayerStatus := time.Tick(time.Millisecond * 100)
 
-	loop:
+	updTrackData := time.Tick(time.Millisecond * 500)
+	updPlayerStatus := time.Tick(time.Millisecond * 85)
+
+loop:
 	for {
 		select {
 
@@ -52,15 +54,14 @@ func (a *ControlCenterApp) updateGUI(gui *ControlCenterPanelGUI) {
 loop:
 	for {
 		select {
-		case what := <-a.stateChange:
+		case what := <-a.stateStream:
 			switch newValue := what.(type) {
 
 			case TrackInfo:
-				log.Printf("update track info: %v", newValue)
+				//	log.Printf("update track info: %v", newValue)
 				gui.updateTrackDetails(&newValue)
 
 			case TrackVolume:
-				log.Printf("updae track volume: %v", newValue)
 				gui.updateVolume(newValue)
 
 			case PlayStatus:
@@ -68,7 +69,6 @@ loop:
 				// TODO update player status
 
 			case TrackTime:
-				// log.Printf("updae track time elapsed: %v", newValue)
 				gui.updateTrackElapsedTime(newValue)
 			}
 
@@ -76,4 +76,13 @@ loop:
 			break loop
 		}
 	}
+}
+
+func (a *ControlCenterApp) chkPowerStatus() (bool, error) {
+	res, err := a.ctrlClient.Request("check_extpower")
+	fmt.Println(res)
+	if err == nil {
+		return strings.Split(res[0], ": ")[1] == "1", nil
+	}
+	return false, err
 }

@@ -25,7 +25,7 @@ const (
 	stopped
 )
 
-type playerState struct {
+type PlayerState struct {
 	status  PlayStatus
 	track   TrackInfo
 	volume  TrackVolume
@@ -35,17 +35,17 @@ type playerState struct {
 	app         *ControlCenterApp
 }
 
-func NewState(app *ControlCenterApp, stateChange *chan any) *playerState {
-	return &playerState{
+func NewPlayerState(app *ControlCenterApp, stateChange *chan any) *PlayerState {
+	return &PlayerState{
 		stateChange: stateChange,
 		app:         app,
 	}
 }
 
-func (ps *playerState) getTrkData() {
+func (ps *PlayerState) getTrkData() {
 
-	resp := ps.app.mpdClient.Req("currentsong")
-	if resp == nil {
+	resp, err := ps.app.mpdClient.Request("currentsong")
+	if err != nil {
 		return
 	}
 
@@ -70,9 +70,10 @@ func (ps *playerState) getTrkData() {
 		*(ps.stateChange) <- ps.track
 	}
 }
-func (ps *playerState) getStatus() {
-	resp := ps.app.mpdClient.Req("status")
-	if resp == nil {
+
+func (ps *PlayerState) getStatus() {
+	resp, err := ps.app.mpdClient.Request("status")
+	if err != nil {
 		return
 	}
 	vol := TrackVolume(tryExtractInt(resp, "volume:", int64(ps.volume)))
@@ -82,7 +83,7 @@ func (ps *playerState) getStatus() {
 	}
 
 	elpsd := TrackTime(tryExtractFloat(resp, "elapsed:", float64(ps.elapsed)))
-	if int(ps.elapsed) != int(elpsd) {
+	if (ps.elapsed) != (elpsd) {
 		ps.elapsed = elpsd
 		*(ps.stateChange) <- TrackTime(elpsd)
 	}

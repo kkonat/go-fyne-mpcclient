@@ -8,50 +8,87 @@ import (
 )
 
 type Client struct {
-	serverAddr string
-	mtx        *sync.Mutex
-	conn       net.Conn
+	serverAddr    string
+	mtx           *sync.Mutex
+	conn          net.Conn
+	connectOnce   bool
+	online        bool
+	lastReconnect time.Time
 }
 
-func NewClient(addr string) *Client {
-	clnt := &Client{serverAddr: addr, mtx: &sync.Mutex{}}
-	clnt.attemptReconnect()
+func NewClient(addr string, connectOnce bool) *Client {
+	clnt := &Client{serverAddr: addr, mtx: &sync.Mutex{}, connectOnce: connectOnce}
+	if !connectOnce {
+		clnt.reconnect()
+	}
 	return clnt
 }
 
-func (s *Client) attemptReconnect() net.Conn {
-	if s.conn == nil {
-		conn, err := net.DialTimeout("tcp", s.serverAddr, time.Millisecond*200)
-		if err == nil {
-			s.conn = conn
+func (c *Client) reconnect() error {
+	if !c.online {
+		if time.Since(c.lastReconnect) > time.Second {
+			c.lastReconnect = time.Now()
+			// log.Println("Reconnecting...")
+
+			conn, err := net.DialTimeout("tcp", c.serverAddr, time.Millisecond*200)
+
+			if err == nil {
+				// log.Println(" OK connected...")
+				c.conn = conn
+				c.online = true
+			} else {
+				c.online = false
+				// log.Println("Failed to connect to server :", err.Error())
+				return err
+			}
 		}
 	}
-	return s.conn
+	return nil
 }
 
-func (s *Client) Req(cmd string) []string {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+func (c *Client) Request(cmd string) ([]string, error) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 
-	s.attemptReconnect()
-	if s.conn == nil {
-		return nil // TODO: handle more detailed error connecting to server ?
+	if c.connectOnce {
+		conn, err := net.DialTimeout("tcp", c.serverAddr, time.Millisecond*200)
+		if err == nil {
+			// log.Println(" OK connected...")
+			c.conn = conn
+		} else {
+			return nil, err
+		}
+	} else {
+		err := c.reconnect()
+		if err != nil || !c.online {
+			return nil, err
+		}
 	}
-
-	_, err := s.conn.Write([]byte(cmd + "\n"))
+	_, err := c.conn.Write([]byte(cmd + "\n"))
 	if err != nil {
-		s.conn.Close()
-		s.conn = nil
-		return nil
+		if !c.connectOnce {
+			c.conn.Close()
+			c.online = false
+		}
+		return nil, err
 	}
 
-	scanner := bufio.NewScanner(s.conn)
-	resp := parseResponse(scanner)
-
-	return resp
+	scanner := bufio.NewScanner(c.conn)
+	resp, err := parseResponse(scanner)
+	if err != nil {
+		if !c.connectOnce {
+			c.conn.Close()
+			c.online = false
+		}
+		return nil, err
+	}
+	if c.connectOnce {
+		c.conn.Close()
+	}
+	return resp, nil
 }
 
-func parseResponse(scanner *bufio.Scanner) []string {
+func parseResponse(scanner *bufio.Scanner) ([]string, error) {
 	resp := []string{}
 
 	for scanner.Scan() {
@@ -65,5 +102,6 @@ func parseResponse(scanner *bufio.Scanner) []string {
 			resp = append(resp, scanner.Text())
 		}
 	}
-	return resp
+	err := scanner.Err()
+	return resp, err
 }
