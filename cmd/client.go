@@ -7,30 +7,34 @@ import (
 	"time"
 )
 
-type Client struct {
-	serverAddr    string
-	mtx           *sync.Mutex
-	conn          net.Conn
-	connectOnce   bool
-	online        bool
+type TCPClient struct {
+	address       string      //TCP serer address in the format "IP:port"
+	mtx           *sync.Mutex // lock for hw access
+	conn          net.Conn    // (re-)established connection
+	singleRequest bool        // true for TCP servers which disconnect after a single request
+	online        bool        // server current online state
 	lastReconnect time.Time
 }
 
-func NewClient(addr string, connectOnce bool) *Client {
-	clnt := &Client{serverAddr: addr, mtx: &sync.Mutex{}, connectOnce: connectOnce}
-	if !connectOnce {
+type TCPClientParms struct {
+	addr          string
+	singleRequest bool
+}
+
+func NewClient(params TCPClientParms) *TCPClient {
+	clnt := &TCPClient{address: params.addr, mtx: &sync.Mutex{}, singleRequest: params.singleRequest}
+	if !clnt.singleRequest {
 		clnt.reconnect()
 	}
 	return clnt
 }
 
-func (c *Client) reconnect() error {
+func (c *TCPClient) reconnect() error {
 	if !c.online {
 		if time.Since(c.lastReconnect) > time.Second {
 			c.lastReconnect = time.Now()
 			// log.Println("Reconnecting...")
-
-			conn, err := net.DialTimeout("tcp", c.serverAddr, time.Millisecond*200)
+			conn, err := net.DialTimeout("tcp", c.address, time.Millisecond*200)
 
 			if err == nil {
 				// log.Println(" OK connected...")
@@ -46,12 +50,12 @@ func (c *Client) reconnect() error {
 	return nil
 }
 
-func (c *Client) Request(cmd string) ([]string, error) {
+func (c *TCPClient) Request(cmd string) ([]string, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.connectOnce {
-		conn, err := net.DialTimeout("tcp", c.serverAddr, time.Millisecond*200)
+	if c.singleRequest {
+		conn, err := net.DialTimeout("tcp", c.address, time.Millisecond*200)
 		if err == nil {
 			// log.Println(" OK connected...")
 			c.conn = conn
@@ -66,7 +70,7 @@ func (c *Client) Request(cmd string) ([]string, error) {
 	}
 	_, err := c.conn.Write([]byte(cmd + "\n"))
 	if err != nil {
-		if !c.connectOnce {
+		if !c.singleRequest {
 			c.conn.Close()
 			c.online = false
 		}
@@ -76,13 +80,13 @@ func (c *Client) Request(cmd string) ([]string, error) {
 	scanner := bufio.NewScanner(c.conn)
 	resp, err := parseResponse(scanner)
 	if err != nil {
-		if !c.connectOnce {
+		if !c.singleRequest {
 			c.conn.Close()
 			c.online = false
 		}
 		return nil, err
 	}
-	if c.connectOnce {
+	if c.singleRequest {
 		c.conn.Close()
 	}
 	return resp, nil

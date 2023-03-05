@@ -2,37 +2,37 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"strings"
 	"time"
 )
 
 type ControlCenterApp struct {
-	mpdClient   *Client
-	ctrlClient  *Client
 	ctx         context.Context
 	state       *PlayerState
+	hw          *HWInterface
 	stateStream chan any
 }
 
-func NewControlCenterApp(ctx context.Context) *ControlCenterApp {
+func NewControlCenterApp(ctx context.Context, hw *HWInterface) *ControlCenterApp {
 	app := &ControlCenterApp{
-		mpdClient:  NewClient("192.168.0.95:6600", false),
-		ctrlClient: NewClient("192.168.0.95:1025", true),
-		ctx:        ctx,
+		ctx: ctx,
+		hw:  hw,
 	}
 	app.stateStream = make(chan any)
-	app.state = NewPlayerState(app, &app.stateStream)
+	app.state = NewPlayerState(hw, &app.stateStream)
 
 	return app
 }
 
+func (a *ControlCenterApp) toglleHWPower() (bool, error) {
+	a.hw.togglePower()
+	return a.state.getHWState()
+}
 func (a *ControlCenterApp) refreshState() {
 
 	updTrackData := time.Tick(time.Millisecond * 500)
 	updPlayerStatus := time.Tick(time.Millisecond * 85)
-
+	updHwStatus := time.Tick(time.Second)
 loop:
 	for {
 		select {
@@ -42,6 +42,9 @@ loop:
 
 		case <-updPlayerStatus:
 			go a.state.getStatus()
+
+		case <-updHwStatus:
+			go a.state.getHWState()
 
 		case <-a.ctx.Done():
 			break loop
@@ -70,19 +73,14 @@ loop:
 
 			case TrackTime:
 				gui.updateTrackElapsedTime(newValue)
+
+			case PowerStatus:
+				log.Printf("power status: %v", newValue)
+				gui.updatePowerBbutton(bool(newValue))
 			}
 
 		case <-a.ctx.Done():
 			break loop
 		}
 	}
-}
-
-func (a *ControlCenterApp) chkPowerStatus() (bool, error) {
-	res, err := a.ctrlClient.Request("check_extpower")
-	fmt.Println(res)
-	if err == nil {
-		return strings.Split(res[0], ": ")[1] == "1", nil
-	}
-	return false, err
 }

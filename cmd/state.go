@@ -18,6 +18,7 @@ type TrackTime float64
 type TrackVolume int64
 
 type PlayStatus int
+type PowerStatus bool
 
 const (
 	paused PlayStatus = iota
@@ -32,19 +33,23 @@ type PlayerState struct {
 	elapsed TrackTime
 
 	stateChange *chan any
-	app         *ControlCenterApp
+	hw          *HWInterface
 }
 
-func NewPlayerState(app *ControlCenterApp, stateChange *chan any) *PlayerState {
+func NewPlayerState(hw *HWInterface, stateChange *chan any) *PlayerState {
 	return &PlayerState{
 		stateChange: stateChange,
-		app:         app,
+		hw:          hw,
 	}
+}
+
+func (ps *PlayerState) Request(server, command string) ([]string, error) {
+	return ps.hw.clients[server].Request(command)
 }
 
 func (ps *PlayerState) getTrkData() {
 
-	resp, err := ps.app.mpdClient.Request("currentsong")
+	resp, err := ps.Request("mpd", "currentsong")
 	if err != nil {
 		return
 	}
@@ -72,7 +77,7 @@ func (ps *PlayerState) getTrkData() {
 }
 
 func (ps *PlayerState) getStatus() {
-	resp, err := ps.app.mpdClient.Request("status")
+	resp, err := ps.Request("mpd", "status")
 	if err != nil {
 		return
 	}
@@ -87,6 +92,19 @@ func (ps *PlayerState) getStatus() {
 		ps.elapsed = elpsd
 		*(ps.stateChange) <- TrackTime(elpsd)
 	}
+}
+
+func (ps *PlayerState) getHWState() (bool, error) {
+	var pwrState bool
+	var err error
+	if pwrState, err = ps.hw.chkPowerStatus(); err == nil {
+		if ps.hw.powerOn != pwrState {
+			*(ps.stateChange) <- PowerStatus(pwrState)
+		}
+		ps.hw.powerOn = pwrState
+	}
+	return pwrState, err
+
 }
 
 // Helper functions

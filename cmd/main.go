@@ -13,7 +13,8 @@ func main() {
 	defer cancel()
 
 	fyneApp := app.New()
-	ccApp := NewControlCenterApp(ctx)
+	hw := NewHWInterface()
+	ccApp := NewControlCenterApp(ctx, hw)
 	window := fyneApp.NewWindow("Remote Control Center")
 	ccGui := newControlCenterAppGUI(window, ccApp)
 
