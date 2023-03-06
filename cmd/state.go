@@ -13,6 +13,7 @@ type TrackInfo struct {
 	track    string
 	duration TrackTime
 	hash     uint32
+	song     int
 }
 type TrackTime float64
 type TrackVolume int64
@@ -85,6 +86,8 @@ func (ps *PlayerState) getMPDStatus() {
 		ps.volume = vol
 		*(ps.stateChange) <- TrackVolume(vol)
 	}
+
+	ps.track.song = int(tryExtractInt(resp, "song:", int64(ps.track.song)))
 
 	elpsd := TrackTime(tryExtractFloat(resp, "elapsed:", float64(ps.elapsed)))
 	if (ps.elapsed) != (elpsd) {
