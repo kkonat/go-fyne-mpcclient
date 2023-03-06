@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"fyne.io/fyne/v2/app"
@@ -11,7 +10,7 @@ import (
 var buildDate string
 
 func main() {
-	fmt.Println("Build date: ", buildDate)
+	// fmt.Println("Build date: ", buildDate)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

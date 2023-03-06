@@ -86,8 +86,9 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 		nil,
 		slider,
 		container.NewVBox(
-			c.artist, c.album, c.track, c.prgrs, widget.NewSeparator(),
-			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
+			c.artist, c.album, c.track, c.prgrs,
+			//  widget.NewSeparator(),
+
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
 					app.hw.Request("mpd", "previous")
@@ -95,20 +96,19 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 					app.hw.Request("mpd", "play")
-					c.setStatusText("playing")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() {
 					app.hw.Request("mpd", "pause")
-					c.setStatusText("paused")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() {
 					app.hw.Request("mpd", "stop")
-					c.setStatusText("stopped")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
 					app.hw.Request("mpd", "next")
 					c.setStatusText("skip next")
 				})),
+			widget.NewSeparator(),
+			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			c.bPower,
 			bShtDn),
 	)

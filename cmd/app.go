@@ -54,7 +54,6 @@ func (a *ControlCenterApp) handleStateChanges(gui *ControlCenterPanelGUI) {
 			switch newValue := chgdState.(type) {
 
 			case TrackInfo:
-				//	log.Printf("update track info: %v", newValue)
 				gui.updateTrackDetails(&newValue)
 
 			case TrackVolume:
@@ -67,10 +66,9 @@ func (a *ControlCenterApp) handleStateChanges(gui *ControlCenterPanelGUI) {
 				gui.updateTrackElapsedTime(newValue)
 
 			case PowerStatus:
-				// log.Printf("power status: %v", newValue)
 				gui.updatePowerBbutton(bool(newValue))
-			case OnlineStatus:
 
+			case OnlineStatus:
 				gui.updateOnlineStatus(bool(newValue), a.state.status)
 			}
 
