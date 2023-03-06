@@ -25,7 +25,10 @@ OK`
 
 func TestScanner(t *testing.T) {
 	scanner := bufio.NewScanner(strings.NewReader(currentsong))
-	resp := parseResponse(scanner)
+	resp, err := parseResponse(scanner)
+	if err != nil {
+		t.Error("error parsing response")
+	}
 	l12 := strings.Split(currentsong, "\n")[12]
 	if resp[12] != l12 {
 		t.Log("\n" + strings.Join(resp, "\n"))
@@ -34,10 +37,12 @@ func TestScanner(t *testing.T) {
 }
 
 func TestSendCtrlCmd(t *testing.T) {
-	mpc := NewClient("192.168.0.95:6600")
+	mpc := NewTCPClient(TCPClientConf{addr: "192.168.0.95:6600", singleRequest: false})
 
-	resp := mpc.Req("currentsong")
-
+	resp, err := mpc.Request("currentsong")
+	if err != nil {
+		t.Error("error sending request")
+	}
 	log.Println(resp)
 
 	if resp == nil {

@@ -22,7 +22,9 @@ type ControlCenterPanelGUI struct {
 	elapsed              binding.Float
 	lastVol              TrackVolume
 	volLastChngd         time.Time
-	prgrs                *widget.ProgressBar
+	prgrs                *fe.TappableProgressBar
+	storedStatusText     string
+	statusPopupStart     time.Time
 }
 
 func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPanelGUI {
@@ -39,12 +41,12 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 	fe.NewText("Volume:", 10)
 
 	bInputPlayer := widget.NewButton("Player", func() {
-		c.setStatusText("switched to Player")
+		c.setStatusText("switched to Player", 3)
 		app.hw.Request("ctrl", "deq_input_coaxial")
 	})
 
 	bInputTV := widget.NewButton("TV", func() {
-		c.setStatusText("switched to TV")
+		c.setStatusText("switched to TV", 3)
 		app.hw.Request("ctrl", "deq_input_optical")
 	})
 
@@ -53,7 +55,7 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 	})
 
 	bShtDn := widget.NewButton("Shutdown", func() {
-		c.setStatusText("Shutting down...")
+		c.setStatusText("Shutting down...", 0)
 		app.hw.Request("ctrl", "server_poweroff")
 	})
 
@@ -74,11 +76,17 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 		}
 	}
 
-	c.prgrs = widget.NewProgressBarWithData(c.elapsed)
+	c.prgrs = fe.NewTappableProgressBarWithData(c.elapsed)
+	c.prgrs.OnTapped = func(v float64) {
+		seek := float64(app.state.track.duration) * v
+		song := app.state.track.song
+		app.hw.Request("mpd", fmt.Sprintf("seek %d %d", song, int(seek)))
+	}
 	c.prgrs.Max = float64(app.state.track.duration)
 	c.prgrs.TextFormatter = func() string {
 		return trkTimeToString(float32(c.prgrs.Value))
 	}
+	bConf := widget.NewButton("Config", func() {})
 
 	con := container.NewBorder(
 		nil,
@@ -86,31 +94,31 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 		nil,
 		slider,
 		container.NewVBox(
-			c.artist, c.album, c.track, c.prgrs, widget.NewSeparator(),
-			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
+			bConf,
+			c.artist, c.album, c.track, c.prgrs,
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
 					app.hw.Request("mpd", "previous")
-					c.setStatusText("skip back")
+					c.setStatusText("skip back", 1)
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 					app.hw.Request("mpd", "play")
-					c.setStatusText("playing")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() {
 					app.hw.Request("mpd", "pause")
-					c.setStatusText("paused")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() {
 					app.hw.Request("mpd", "stop")
-					c.setStatusText("stopped")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
 					app.hw.Request("mpd", "next")
-					c.setStatusText("skip next")
+					c.setStatusText("skip next", 1)
 				})),
+			widget.NewSeparator(),
+			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
 			c.bPower,
-			bShtDn),
+			bShtDn,
+		),
 	)
 
 	w.SetContent(con)
@@ -126,7 +134,7 @@ func (c ControlCenterPanelGUI) updatePowerBbutton(powerOn bool) {
 }
 func (c ControlCenterPanelGUI) updateOnlineStatus(online bool, ps PlayStatus) {
 	if !online {
-		c.setStatusText("Offline. Waiting for connection...")
+		c.setStatusText("Offline. Waiting for connection...", 0)
 	} else {
 		c.UpdatePlayStatus(ps)
 	}
@@ -138,26 +146,38 @@ func (c ControlCenterPanelGUI) togglePower(app *ControlCenterApp) {
 	if err = app.hw.togglePower(); err == nil {
 		if state, err = app.state.getHWState(); err == nil {
 			if state {
-				c.setStatusText("powered on")
+				c.setStatusText("powered off", 3)
 			} else {
-				c.setStatusText("powered off")
+				c.setStatusText("powered on", 3)
 			}
 			c.updatePowerBbutton(state)
 		}
 	}
 }
-func (c ControlCenterPanelGUI) setStatusText(t string) {
-	c.statusL.Text = t
+func (c ControlCenterPanelGUI) setStatusText(newText string, howLong int) {
+	if howLong == 0 {
+		c.statusL.Text = newText
+		c.statusL.Refresh()
+		return
+	}
+
+	c.storedStatusText = c.statusL.Text
+	c.statusL.Text = newText
+	time.AfterFunc(time.Second*time.Duration(howLong),
+		func() {
+			c.statusL.Text = c.storedStatusText
+			c.statusL.Refresh()
+		})
 	c.statusL.Refresh()
 }
 func (c *ControlCenterPanelGUI) UpdatePlayStatus(s PlayStatus) {
 	switch s {
 	case playing:
-		c.setStatusText("Playing...")
+		c.setStatusText("Playing...", 0)
 	case stopped:
-		c.setStatusText("Stopped")
+		c.setStatusText("Stopped", 0)
 	case paused:
-		c.setStatusText("Paused")
+		c.setStatusText("Paused", 0)
 	}
 }
 func (c *ControlCenterPanelGUI) updateTrackDetails(ti *TrackInfo) {
