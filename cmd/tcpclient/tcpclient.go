@@ -1,4 +1,4 @@
-package main
+package tcpclient
 
 import (
 	"bufio"
@@ -7,30 +7,36 @@ import (
 	"time"
 )
 
-type TCPClient struct {
-	address       string      //TCP serer address in the format "IP:port"
+type Client struct {
+	address       string //TCP serer address in the format "IP:port"
+	singleRequest bool   // true for TCP servers which disconnect after a single request
+
 	mtx           *sync.Mutex // lock for hw access
 	conn          net.Conn    // (re-)established connection
-	singleRequest bool        // true for TCP servers which disconnect after a single request
-	online        bool        // server current online state
 	lastReconnect time.Time
+
+	Online bool // server current online state
 }
 
-type TCPClientConf struct {
-	addr          string
-	singleRequest bool
+type Conf struct {
+	Addr          string
+	SingleRequest bool
 }
 
-func NewTCPClient(params TCPClientConf) *TCPClient {
-	clnt := &TCPClient{address: params.addr, mtx: &sync.Mutex{}, singleRequest: params.singleRequest}
+func New(params Conf) *Client {
+	clnt := &Client{
+		address:       params.Addr,
+		singleRequest: params.SingleRequest,
+		mtx:           &sync.Mutex{}}
+
 	if !clnt.singleRequest {
 		clnt.reconnect()
 	}
 	return clnt
 }
 
-func (c *TCPClient) reconnect() error {
-	if !c.online {
+func (c *Client) reconnect() error {
+	if !c.Online {
 		if time.Since(c.lastReconnect) > time.Second {
 			c.lastReconnect = time.Now()
 			// log.Println("Reconnecting...")
@@ -39,9 +45,9 @@ func (c *TCPClient) reconnect() error {
 			if err == nil {
 				// log.Println(" OK connected...")
 				c.conn = conn
-				c.online = true
+				c.Online = true
 			} else {
-				c.online = false
+				c.Online = false
 				// log.Println("Failed to connect to server :", err.Error())
 				return err
 			}
@@ -50,7 +56,7 @@ func (c *TCPClient) reconnect() error {
 	return nil
 }
 
-func (c *TCPClient) Request(cmd string) ([]string, error) {
+func (c *Client) Request(cmd string) ([]string, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -64,7 +70,7 @@ func (c *TCPClient) Request(cmd string) ([]string, error) {
 		}
 	} else {
 		err := c.reconnect()
-		if err != nil || !c.online {
+		if err != nil || !c.Online {
 			return nil, err
 		}
 	}
@@ -72,7 +78,7 @@ func (c *TCPClient) Request(cmd string) ([]string, error) {
 	if err != nil {
 		if !c.singleRequest {
 			c.conn.Close()
-			c.online = false
+			c.Online = false
 		}
 		return nil, err
 	}
@@ -82,7 +88,7 @@ func (c *TCPClient) Request(cmd string) ([]string, error) {
 	if err != nil {
 		if !c.singleRequest {
 			c.conn.Close()
-			c.online = false
+			c.Online = false
 		}
 		return nil, err
 	}
