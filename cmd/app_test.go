@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"remotecc/cmd/state"
+	"testing"
+)
 
 func TestFormatTime(t *testing.T) {
 
@@ -14,7 +17,7 @@ func TestFormatTime(t *testing.T) {
 	}
 
 	for _, tst := range tests {
-		str := trkTimeToString(tst.tflt)
+		str := state.TrkTimeToString(tst.tflt)
 		if str != tst.tstr {
 			t.Errorf("time conversion fail: %f -> %s was %s", tst.tflt, tst.tstr, str)
 		}

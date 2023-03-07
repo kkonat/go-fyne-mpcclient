@@ -1,4 +1,4 @@
-package main
+package tcpclient
 
 import (
 	"bufio"
@@ -37,7 +37,7 @@ func TestScanner(t *testing.T) {
 }
 
 func TestSendCtrlCmd(t *testing.T) {
-	mpc := NewTCPClient(TCPClientConf{addr: "192.168.0.95:6600", singleRequest: false})
+	mpc := New(Conf{Addr: "192.168.0.95:6600", SingleRequest: false})
 
 	resp, err := mpc.Request("currentsong")
 	if err != nil {
