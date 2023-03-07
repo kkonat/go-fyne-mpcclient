@@ -26,9 +26,13 @@ type ControlCenterPanelGUI struct {
 	volLastChngd         time.Time
 	prgrs                *fe.TappableProgressBar
 	storedStatusText     string
+
 	statusPopupStart     time.Time
 	Hw                   hw.HWInterface
 	State                state.PlayerState
+
+	IPaddrs              binding.String
+
 }
 
 func newControlCenterAppGUI(w f2.Window, Hw hw.HWInterface, State state.PlayerState) *ControlCenterPanelGUI {
@@ -42,9 +46,11 @@ func newControlCenterAppGUI(w f2.Window, Hw hw.HWInterface, State state.PlayerSt
 		track:   fe.NewText("Trk:", 12),
 		statusL: fe.NewText("Ready", 10),
 		vol:     binding.NewFloat(),
-		elapsed: binding.NewFloat()}
+		elapsed: binding.NewFloat(),
+		IPaddrs: binding.NewString()}
 
 	fe.NewText("Volume:", 10)
+	c.IPaddrs.Set("192.168.0.95:6600")
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.setStatusText("switched to Player", 3)
@@ -92,15 +98,17 @@ func newControlCenterAppGUI(w f2.Window, Hw hw.HWInterface, State state.PlayerSt
 	c.prgrs.TextFormatter = func() string {
 		return state.TrkTimeToString(float32(c.prgrs.Value))
 	}
-	bConf := widget.NewButton("Config", func() {})
 
-	con := container.NewBorder(
+	// menu := f2.NewMainMenu(f2.NewMenu("...",
+	// 	f2.NewMenuItem("Config", func() {}),
+	// 	f2.NewMenuItem("Show hw controls", func() {})))
+
+	conPlayer := container.NewBorder(
 		nil,
 		container.NewVBox(widget.NewSeparator(), c.statusL),
 		nil,
 		slider,
 		container.NewVBox(
-			bConf,
 			c.artist, c.album, c.track, c.prgrs,
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
@@ -120,15 +128,30 @@ func newControlCenterAppGUI(w f2.Window, Hw hw.HWInterface, State state.PlayerSt
 					Hw.Request("mpd", "next")
 					c.setStatusText("skip next", 1)
 				})),
-			widget.NewSeparator(),
-			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
-			c.bPower,
-			bShtDn,
 		),
 	)
+	conHW := container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
+		container.NewVBox(container.NewGridWithColumns(2, bInputPlayer, bInputTV),
+			c.bPower,
+			bShtDn),
+	)
+	conSettings := container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
+		container.NewVBox(
+			widget.NewLabel("Settings"),
+			widget.NewSeparator(),
+			widget.NewLabel("IP:"),
+			widget.NewEntryWithData(c.IPaddrs)),
+	)
+	tabs := container.NewAppTabs(
+		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), conPlayer),
+		container.NewTabItemWithIcon("", theme.ComputerIcon(), conHW),
+		container.NewTabItemWithIcon("", theme.SettingsIcon(), conSettings),
+	)
 
-	w.SetContent(con)
+	tabs.SetTabLocation(container.TabLocationTop)
 
+	w.SetContent(tabs)
+	// w.SetMainMenu(menu)
 	return c
 }
 func (c ControlCenterPanelGUI) updatePowerBbutton(powerOn bool) {
