@@ -26,9 +26,10 @@ type ControlCenterPanelGUI struct {
 	volLastChngd         time.Time
 	prgrs                *fe.TappableProgressBar
 	storedStatusText     string
-	statusPopupStart     time.Time
-
-	stateStream chan any
+	IPaddrs              binding.String
+	volPremut            int
+	muted                bool
+	stateStream          chan any
 
 	Hw    *hw.HWInterface
 	State *state.PlayerState
@@ -44,9 +45,13 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 		track:   fe.NewText("Trk:", 12),
 		statusL: fe.NewText("Ready", 10),
 		vol:     binding.NewFloat(),
-		elapsed: binding.NewFloat()}
+		elapsed: binding.NewFloat(),
+		IPaddrs: binding.NewString(),
+		muted:   false,
+	}
 
 	fe.NewText("Volume:", 10)
+	c.IPaddrs.Set("192.168.0.95:6600")
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.SetStatusText("switched to Player", 3)
@@ -94,15 +99,10 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 	c.prgrs.TextFormatter = func() string {
 		return state.TrkTimeToString(float32(c.prgrs.Value))
 	}
-	bConf := widget.NewButton("Config", func() {})
 
-	con := container.NewBorder(
-		nil,
-		container.NewVBox(widget.NewSeparator(), c.statusL),
-		nil,
-		slider,
+	conPlayer :=
+
 		container.NewVBox(
-			bConf,
 			c.artist, c.album, c.track, c.prgrs,
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
@@ -122,14 +122,37 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 					Hw.Request("mpd", "next")
 					c.SetStatusText("skip next", 1)
 				})),
-			widget.NewSeparator(),
-			container.NewGridWithColumns(2, bInputPlayer, bInputTV),
-			c.bPower,
-			bShtDn,
-		),
-	)
+		)
+	conHW := container.NewVBox(container.NewGridWithColumns(2, bInputPlayer, bInputTV),
+		c.bPower,
+		bShtDn)
 
-	w.SetContent(con)
+	conSettings :=
+		container.NewVBox(
+			widget.NewLabel("Settings"),
+			widget.NewSeparator(),
+			widget.NewLabel("IP:"),
+			widget.NewEntryWithData(c.IPaddrs))
+
+	tabs := container.NewAppTabs(
+		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), conPlayer),
+		container.NewTabItemWithIcon("", theme.ComputerIcon(), conHW),
+		container.NewTabItemWithIcon("", theme.SettingsIcon(), conSettings),
+	)
+	tabs.SetTabLocation(container.TabLocationTop)
+	w.SetContent(
+		container.NewBorder(nil, nil, nil, container.NewBorder(nil,
+			widget.NewButtonWithIcon("", theme.VolumeMuteIcon(), func() {
+				if c.muted {
+					Hw.Request("mpd", fmt.Sprintf("setvol %d", c.volPremut))
+				} else {
+					c.volPremut = int(c.State.Volume)
+				}
+				c.muted = !c.muted
+			}), nil, nil,
+			slider),
+			container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
+				tabs)))
 
 	return c
 }
@@ -168,7 +191,6 @@ func (c ControlCenterPanelGUI) SetStatusText(newText string, howLong int) {
 		c.statusL.Refresh()
 		return
 	}
-
 	c.storedStatusText = c.statusL.Text
 	c.statusL.Text = newText
 	time.AfterFunc(time.Second*time.Duration(howLong),
@@ -178,6 +200,7 @@ func (c ControlCenterPanelGUI) SetStatusText(newText string, howLong int) {
 		})
 	c.statusL.Refresh()
 }
+
 func (c *ControlCenterPanelGUI) UpdatePlayStatus(s state.PlayStatus) {
 	switch s {
 	case state.Playing:
