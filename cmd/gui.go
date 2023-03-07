@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	fe "remotecc/fynextensions"
+	fe "remotecc/cmd/fynextensions"
+	hw "remotecc/cmd/hwinterface"
+	"remotecc/cmd/state"
 
 	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,16 +22,20 @@ type ControlCenterPanelGUI struct {
 	bPower               *widget.Button
 	vol                  binding.Float
 	elapsed              binding.Float
-	lastVol              TrackVolume
+	lastVol              state.TrackVolume
 	volLastChngd         time.Time
 	prgrs                *fe.TappableProgressBar
 	storedStatusText     string
 	statusPopupStart     time.Time
+	Hw                   hw.HWInterface
+	State                state.PlayerState
 }
 
-func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPanelGUI {
+func newControlCenterAppGUI(w f2.Window, Hw hw.HWInterface, State state.PlayerState) *ControlCenterPanelGUI {
 
 	c := &ControlCenterPanelGUI{
+		Hw:    Hw,
+		State: State,
 
 		artist:  fe.NewText("Artist:", 12),
 		album:   fe.NewText("Album:", 12),
@@ -42,28 +48,28 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 
 	bInputPlayer := widget.NewButton("Player", func() {
 		c.setStatusText("switched to Player", 3)
-		app.hw.Request("ctrl", "deq_input_coaxial")
+		Hw.Request("ctrl", "deq_input_coaxial")
 	})
 
 	bInputTV := widget.NewButton("TV", func() {
 		c.setStatusText("switched to TV", 3)
-		app.hw.Request("ctrl", "deq_input_optical")
+		Hw.Request("ctrl", "deq_input_optical")
 	})
 
 	c.bPower = widget.NewButton("Power", func() {
-		c.togglePower(app)
+		c.togglePower()
 	})
 
 	bShtDn := widget.NewButton("Shutdown", func() {
 		c.setStatusText("Shutting down...", 0)
-		app.hw.Request("ctrl", "server_poweroff")
+		Hw.Request("ctrl", "server_poweroff")
 	})
 
 	slider := widget.NewSliderWithData(0, 100, c.vol)
 	slider.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
 	slider.Move(f2.NewPos(0, 20))
 
-	c.lastVol = app.state.volume
+	c.lastVol = State.Volume
 	c.volLastChngd = time.Now()
 
 	// volume slider
@@ -72,19 +78,19 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 		if time.Since(c.volLastChngd).Milliseconds() > 100 {
 			c.volLastChngd = time.Now()
 			v := int(val)
-			app.hw.Request("mpd", fmt.Sprintf("setvol %d", v))
+			Hw.Request("mpd", fmt.Sprintf("setvol %d", v))
 		}
 	}
 
 	c.prgrs = fe.NewTappableProgressBarWithData(c.elapsed)
 	c.prgrs.OnTapped = func(v float64) {
-		seek := float64(app.state.track.duration) * v
-		song := app.state.track.song
-		app.hw.Request("mpd", fmt.Sprintf("seek %d %d", song, int(seek)))
+		seek := float64(State.Track.Duration) * v
+		song := State.Track.Song
+		Hw.Request("mpd", fmt.Sprintf("seek %d %d", song, int(seek)))
 	}
-	c.prgrs.Max = float64(app.state.track.duration)
+	c.prgrs.Max = float64(State.Track.Duration)
 	c.prgrs.TextFormatter = func() string {
-		return trkTimeToString(float32(c.prgrs.Value))
+		return state.TrkTimeToString(float32(c.prgrs.Value))
 	}
 	bConf := widget.NewButton("Config", func() {})
 
@@ -98,20 +104,20 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 			c.artist, c.album, c.track, c.prgrs,
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
-					app.hw.Request("mpd", "previous")
+					Hw.Request("mpd", "previous")
 					c.setStatusText("skip back", 1)
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
-					app.hw.Request("mpd", "play")
+					Hw.Request("mpd", "play")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() {
-					app.hw.Request("mpd", "pause")
+					Hw.Request("mpd", "pause")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaStopIcon(), func() {
-					app.hw.Request("mpd", "stop")
+					Hw.Request("mpd", "stop")
 				}),
 				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
-					app.hw.Request("mpd", "next")
+					Hw.Request("mpd", "next")
 					c.setStatusText("skip next", 1)
 				})),
 			widget.NewSeparator(),
@@ -132,7 +138,7 @@ func (c ControlCenterPanelGUI) updatePowerBbutton(powerOn bool) {
 		c.bPower.SetText("Power on")
 	}
 }
-func (c ControlCenterPanelGUI) updateOnlineStatus(online bool, ps PlayStatus) {
+func (c ControlCenterPanelGUI) updateOnlineStatus(online bool, ps state.PlayStatus) {
 	if !online {
 		c.setStatusText("Offline. Waiting for connection...", 0)
 	} else {
@@ -140,11 +146,11 @@ func (c ControlCenterPanelGUI) updateOnlineStatus(online bool, ps PlayStatus) {
 	}
 }
 
-func (c ControlCenterPanelGUI) togglePower(app *ControlCenterApp) {
+func (c ControlCenterPanelGUI) togglePower() {
 	var state bool
 	var err error
-	if err = app.hw.togglePower(); err == nil {
-		if state, err = app.state.getHWState(); err == nil {
+	if err = Hw.TogglePower(); err == nil {
+		if state, err = c.State.GetHWState(); err == nil {
 			if state {
 				c.setStatusText("powered off", 3)
 			} else {
@@ -170,31 +176,31 @@ func (c ControlCenterPanelGUI) setStatusText(newText string, howLong int) {
 		})
 	c.statusL.Refresh()
 }
-func (c *ControlCenterPanelGUI) UpdatePlayStatus(s PlayStatus) {
+func (c *ControlCenterPanelGUI) UpdatePlayStatus(s state.PlayStatus) {
 	switch s {
-	case playing:
+	case state.Playing:
 		c.setStatusText("Playing...", 0)
-	case stopped:
+	case state.Stopped:
 		c.setStatusText("Stopped", 0)
-	case paused:
+	case state.Paused:
 		c.setStatusText("Paused", 0)
 	}
 }
-func (c *ControlCenterPanelGUI) updateTrackDetails(ti *TrackInfo) {
-	c.album.Text = "Album: " + ti.album
-	c.artist.Text = "Artist: " + ti.artist
-	c.track.Text = ti.track
+func (c *ControlCenterPanelGUI) updateTrackDetails(ti *state.TrackInfo) {
+	c.album.Text = "Album: " + ti.Album
+	c.artist.Text = "Artist: " + ti.Artist
+	c.track.Text = ti.Track
 	c.album.Refresh()
 	c.artist.Refresh()
 	c.track.Refresh()
-	c.prgrs.Max = float64(ti.duration)
+	c.prgrs.Max = float64(ti.Duration)
 }
 
-func (c *ControlCenterPanelGUI) updateTrackElapsedTime(elTime TrackTime) {
+func (c *ControlCenterPanelGUI) updateTrackElapsedTime(elTime state.TrackTime) {
 	c.elapsed.Set(float64(elTime))
 }
 
-func (c *ControlCenterPanelGUI) updateVolume(v TrackVolume) {
+func (c *ControlCenterPanelGUI) updateVolume(v state.TrackVolume) {
 	c.vol.Set(float64(v))
 	c.lastVol = v
 }
