@@ -120,18 +120,21 @@ func newControlCenterAppGUI(w f2.Window, app *ControlCenterApp) *ControlCenterPa
 				})),
 		),
 	)
-	conHW := container.NewVBox(container.NewGridWithColumns(2, bInputPlayer, bInputTV),
-		c.bPower,
-		bShtDn)
-	conSettings := container.NewVBox(
-		widget.NewLabel("Settings"),
-		widget.NewSeparator(),
-		widget.NewLabel("IP:"),
-		widget.NewEntryWithData(c.IPaddrs),
+	conHW := container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
+		container.NewVBox(container.NewGridWithColumns(2, bInputPlayer, bInputTV),
+			c.bPower,
+			bShtDn),
+	)
+	conSettings := container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
+		container.NewVBox(
+			widget.NewLabel("Settings"),
+			widget.NewSeparator(),
+			widget.NewLabel("IP:"),
+			widget.NewEntryWithData(c.IPaddrs)),
 	)
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Player", conPlayer),
-		container.NewTabItem("HW", conHW),
+		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), conPlayer),
+		container.NewTabItemWithIcon("", theme.ComputerIcon(), conHW),
 		container.NewTabItemWithIcon("", theme.SettingsIcon(), conSettings),
 	)
 
