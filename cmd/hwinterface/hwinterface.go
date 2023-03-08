@@ -2,6 +2,7 @@ package hwinterface
 
 import (
 	"fmt"
+	"remotecc/cmd/storage"
 	"remotecc/cmd/tcpclient"
 	"strings"
 )
@@ -15,10 +16,12 @@ type HWInterface struct {
 }
 
 func NewHWInterface() *HWInterface {
+	mpdAddr := storage.AppSettings.Server.IPAddr + ":" + storage.AppSettings.Server.MPDPort
+	ctrlAddr := storage.AppSettings.Server.IPAddr + ":" + storage.AppSettings.Server.CtrlPort
 	return &HWInterface{
 		clients: map[string]*tcpclient.Client{
-			"mpd":  tcpclient.New(tcpclient.Conf{Addr: "192.168.0.95:6600", SingleRequest: false}),
-			"ctrl": tcpclient.New(tcpclient.Conf{Addr: "192.168.0.95:1025", SingleRequest: true}),
+			"mpd":  tcpclient.New(tcpclient.Conf{Addr: mpdAddr, SingleRequest: false}),
+			"ctrl": tcpclient.New(tcpclient.Conf{Addr: ctrlAddr, SingleRequest: true}),
 		},
 	}
 }
