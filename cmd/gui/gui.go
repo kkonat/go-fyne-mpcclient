@@ -1,8 +1,10 @@
 package gui
 
 import (
+	"fmt"
 	hw "remotecc/cmd/hwinterface"
 	"remotecc/cmd/state"
+	"remotecc/cmd/storage"
 
 	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -18,29 +20,32 @@ type MainWindow struct {
 	SettingsTab  *SettingsTab
 	FilesTreeTab *FilesTreeTab
 	StatusLine   *StatusText
+	tabs         *container.AppTabs
 
 	// complex elements
 	VolSlider *VolumeSlider
 }
 
-// global references for all GUIC components
+// references to all GUI components
 // declared global so they do not need to be passed to each GUI element
 var (
 	Hw          *hw.HWInterface
 	State       *state.PlayerState
 	stateStream chan any
 	MW          *MainWindow
+	AppWindow   *f2.Window
 )
 
 func NewMainWindow() *MainWindow {
 	MW = &MainWindow{}
-
+	fmt.Println("NewMainWindow")
 	return MW
 }
 
-func Init(w f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface) {
-
+func Init(w *f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface) {
+	fmt.Println("Init")
 	// Set global variables
+	AppWindow = w
 	State = s
 	Hw = h
 	stateStream = stream
@@ -58,25 +63,44 @@ func Init(w f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface)
 	MW.SettingsTab = NewSettingsTab()
 	MW.FilesTreeTab = NewFilesTreeTab()
 
-	tabs := container.NewAppTabs(
-		container.NewTabItemWithIcon("", theme.MediaPlayIcon(), MW.PlayerTab.getGUI()),
-		container.NewTabItemWithIcon("", theme.StorageIcon(), MW.PlaylistTab.getGUI()),
-		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), MW.FilesTreeTab.getGUI()),
-		container.NewTabItemWithIcon("", theme.ComputerIcon(), MW.HWTab.getGUI()),
-		container.NewTabItemWithIcon("", theme.SettingsIcon(), MW.SettingsTab.getGUI()),
-	)
-	tabs.SetTabLocation(container.TabLocationTop)
+	MW.genTabs()
+	MW.tabs.SetTabLocation(container.TabLocationTop)
 
-	w.SetContent(
+	(*w).SetContent(
 		container.NewBorder(
 			nil,
 			nil,
 			nil,
-			MW.VolSlider.getGUI(),   // R
-			container.NewBorder(nil, MW.StatusLine.getGUI(), nil, nil, tabs))) // center
+			MW.VolSlider.getGUI(), // R
+			container.NewBorder(nil, MW.StatusLine.getGUI(), nil, nil, MW.tabs))) // center
 
 }
+func (mw *MainWindow) genTabs() {
+	fmt.Println("genTabs")
+	mw.tabs = container.NewAppTabs()
+	mw.tabs.Append(container.NewTabItemWithIcon("", theme.MediaPlayIcon(), MW.PlayerTab.getGUI()))
+	mw.tabs.Append(container.NewTabItemWithIcon("", theme.StorageIcon(), MW.PlaylistTab.getGUI()))
+	mw.tabs.Append(container.NewTabItemWithIcon("", theme.MediaMusicIcon(), MW.FilesTreeTab.getGUI()))
+	if storage.AppSettings.ShowHWCtrl {
+		mw.tabs.Append(container.NewTabItemWithIcon("", theme.ComputerIcon(), MW.HWTab.getGUI()))
+	}
+	mw.tabs.Append(container.NewTabItemWithIcon("", theme.SettingsIcon(), MW.SettingsTab.getGUI()))
+	fmt.Printf("%p vs %p\n", MW.tabs, mw.tabs)
+}
 
+//	func (mw *MainWindow) ShowHideHWcontrols(visible bool) {
+//		if visible {
+//			mw.tabs.RemoveIndex(3)
+//			mw.tabs.Append(container.NewTabItemWithIcon("", theme.ComputerIcon(), MW.HWTab.getGUI()))
+//			mw.tabs.Append(container.NewTabItemWithIcon("", theme.SettingsIcon(), MW.SettingsTab.getGUI()))
+//			mw.tabs.SelectIndex(4)
+//			//mw.addAllTabs()
+//		} else {
+//			mw.tabs.RemoveIndex(3)
+//		}
+//		// fmt.Println("visible: ", mw.tabs.Items[3].Content.Visible())
+//		// mw.tabs.Items[3].Content.Refresh()
+//	}
 func (mw MainWindow) UpdateOnlineStatus(online bool, ps state.PlayStatus) {
 	if !online {
 		mw.StatusLine.Set("Offline. Waiting for connection...", 0)
@@ -95,5 +119,3 @@ func (mw *MainWindow) UpdatePlayStatus(s state.PlayStatus) {
 		mw.StatusLine.Set("Paused", 0)
 	}
 }
-
-

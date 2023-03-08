@@ -16,8 +16,8 @@ import (
 var (
 	stateStream = make(chan any)
 	ctx         context.Context
-	Hw          *hw.HWInterface    = hw.NewHWInterface()
-	State       *state.PlayerState = state.NewPlayerState(Hw, stateStream)
+	Hw          *hw.HWInterface
+	State       *state.PlayerState
 )
 
 func main() {
@@ -26,19 +26,21 @@ func main() {
 	defer cancel()
 
 	storage.Init()
+	Hw = hw.NewHWInterface()
+	State = state.NewPlayerState(Hw, stateStream)
 
 	fyneApp := app.New()
 	window := fyneApp.NewWindow("Remote Control Center")
 	window.Resize(f2.Size{Width: 300, Height: 600})
 
-	gui.Init(window, stateStream, State, Hw)
+	gui.Init(&window, stateStream, State, Hw)
 
 	go MonitorStateChanges()
 	go HandleStateChanges()
 
 	window.ShowAndRun()
 
-	storage.Finalize()
+	// storage.SaveData()
 	log.Print("Goodbye")
 }
 
