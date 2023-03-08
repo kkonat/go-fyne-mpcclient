@@ -4,27 +4,43 @@ import (
 	fe "remotecc/cmd/fynextensions"
 	"time"
 
+	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
-var statusLine *canvas.Text
-var storedStatusText string
-
-func initStatusText() {
-	statusLine = fe.NewText("Ready", 10)
+type StatusText struct {
+	statusLine       *canvas.Text
+	storedStatusText string
 }
-func setStatusText(newText string, howLong int) {
+
+func NewStatusText() *StatusText {
+	st := &StatusText{}
+	st.statusLine = fe.NewText("Ready", 10)
+
+	return st
+}
+
+func (st *StatusText) Set(newText string, howLong int) {
 	if howLong == 0 {
-		statusLine.Text = newText
-		statusLine.Refresh()
+		st.statusLine.Text = newText
+		st.statusLine.Refresh()
 		return
 	}
-	storedStatusText = statusLine.Text
-	statusLine.Text = newText
-	time.AfterFunc(time.Second*time.Duration(howLong),
-		func() {
-			statusLine.Text = storedStatusText
-			statusLine.Refresh()
-		})
-	statusLine.Refresh()
+	st.storedStatusText = st.statusLine.Text
+	st.statusLine.Text = newText
+	time.AfterFunc(
+		time.Second*time.Duration(howLong),
+		st.restorePreviousText)
+	st.statusLine.Refresh()
+}
+
+func (st *StatusText) restorePreviousText() {
+	st.statusLine.Text = st.storedStatusText
+	st.statusLine.Refresh()
+}
+
+func (st *StatusText) getGUI() *f2.Container {
+	return container.NewVBox(widget.NewSeparator(), st.statusLine)
 }

@@ -1,0 +1,5 @@
+server:
+  ctrlport: 1025
+  ipaddr: 192.168.0.95
+  mpdport: 6060
+  showhwctrl: true

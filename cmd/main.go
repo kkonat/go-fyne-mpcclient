@@ -1,44 +1,44 @@
 package main
 
 import (
+	"context"
 	"log"
-	"time"
-
 	"remotecc/cmd/gui"
 	hw "remotecc/cmd/hwinterface"
 	"remotecc/cmd/state"
+	"remotecc/cmd/storage"
+	"time"
 
 	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"golang.org/x/net/context"
 )
 
 var (
-	buildDate   string
 	stateStream = make(chan any)
 	ctx         context.Context
 	Hw          *hw.HWInterface    = hw.NewHWInterface()
 	State       *state.PlayerState = state.NewPlayerState(Hw, stateStream)
-	ccgui       *gui.ControlCenterPanelGUI
 )
 
 func main() {
-	// fmt.Println("Build date: ", buildDate)
 	contx, cancel := context.WithCancel(context.Background())
 	ctx = contx
 	defer cancel()
+
+	storage.Init()
 
 	fyneApp := app.New()
 	window := fyneApp.NewWindow("Remote Control Center")
 	window.Resize(f2.Size{Width: 300, Height: 600})
 
-	ccgui = gui.New(window, stateStream, State, Hw)
+	gui.Init(window, stateStream, State, Hw)
 
 	go MonitorStateChanges()
 	go HandleStateChanges()
 
 	window.ShowAndRun()
 
+	storage.Finalize()
 	log.Print("Goodbye")
 }
 
@@ -73,22 +73,22 @@ func HandleStateChanges() {
 			switch newValue := chgdState.(type) {
 
 			case state.TrackInfo:
-				ccgui.UpdateTrackDetails(&newValue)
+				gui.MW.PlayerTab.UpdateTrackDetails(&newValue)
 
 			case state.TrackVolume:
-				ccgui.UpdateVolume(newValue)
+				gui.MW.VolSlider.UpdateVolume(newValue)
 
 			case state.PlayStatus:
-				ccgui.UpdatePlayStatus(state.PlayStatus(newValue))
+				gui.MW.UpdatePlayStatus(state.PlayStatus(newValue))
 
 			case state.TrackTime:
-				ccgui.UpdateTrackElapsedTime(newValue)
+				gui.MW.PlayerTab.UpdateTrackElapsedTime(newValue)
 
 			case state.PowerStatus:
-				gui.UpdatePowerBbutton(bool(newValue))
+				gui.MW.HWTab.UpdatePowerBbutton(bool(newValue))
 
 			case state.OnlineStatus:
-				ccgui.UpdateOnlineStatus(bool(newValue), State.Status)
+				gui.MW.UpdateOnlineStatus(bool(newValue), State.Status)
 			}
 
 		case <-ctx.Done():
