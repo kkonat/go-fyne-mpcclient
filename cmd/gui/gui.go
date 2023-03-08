@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"fmt"
 	hw "remotecc/cmd/hwinterface"
 	"remotecc/cmd/state"
 	"remotecc/cmd/storage"
@@ -38,12 +37,10 @@ var (
 
 func NewMainWindow() *MainWindow {
 	MW = &MainWindow{}
-	fmt.Println("NewMainWindow")
 	return MW
 }
 
 func Init(w *f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface) {
-	fmt.Println("Init")
 	// Set global variables
 	AppWindow = w
 	State = s
@@ -63,20 +60,10 @@ func Init(w *f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface
 	MW.SettingsTab = NewSettingsTab()
 	MW.FilesTreeTab = NewFilesTreeTab()
 
-	MW.genTabs()
-	MW.tabs.SetTabLocation(container.TabLocationTop)
-
-	(*w).SetContent(
-		container.NewBorder(
-			nil,
-			nil,
-			nil,
-			MW.VolSlider.getGUI(), // R
-			container.NewBorder(nil, MW.StatusLine.getGUI(), nil, nil, MW.tabs))) // center
+	MW.regenWindow()
 
 }
-func (mw *MainWindow) genTabs() {
-	fmt.Println("genTabs")
+func (mw *MainWindow) regenWindow() {
 	mw.tabs = container.NewAppTabs()
 	mw.tabs.Append(container.NewTabItemWithIcon("", theme.MediaPlayIcon(), MW.PlayerTab.getGUI()))
 	mw.tabs.Append(container.NewTabItemWithIcon("", theme.StorageIcon(), MW.PlaylistTab.getGUI()))
@@ -85,22 +72,16 @@ func (mw *MainWindow) genTabs() {
 		mw.tabs.Append(container.NewTabItemWithIcon("", theme.ComputerIcon(), MW.HWTab.getGUI()))
 	}
 	mw.tabs.Append(container.NewTabItemWithIcon("", theme.SettingsIcon(), MW.SettingsTab.getGUI()))
-	fmt.Printf("%p vs %p\n", MW.tabs, mw.tabs)
+	mw.tabs.SetTabLocation(container.TabLocationTop)
+	(*AppWindow).SetContent(
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			MW.VolSlider.getGUI(), // R
+			container.NewBorder(nil, MW.StatusLine.getGUI(), nil, nil, MW.tabs))) // center
 }
 
-//	func (mw *MainWindow) ShowHideHWcontrols(visible bool) {
-//		if visible {
-//			mw.tabs.RemoveIndex(3)
-//			mw.tabs.Append(container.NewTabItemWithIcon("", theme.ComputerIcon(), MW.HWTab.getGUI()))
-//			mw.tabs.Append(container.NewTabItemWithIcon("", theme.SettingsIcon(), MW.SettingsTab.getGUI()))
-//			mw.tabs.SelectIndex(4)
-//			//mw.addAllTabs()
-//		} else {
-//			mw.tabs.RemoveIndex(3)
-//		}
-//		// fmt.Println("visible: ", mw.tabs.Items[3].Content.Visible())
-//		// mw.tabs.Items[3].Content.Refresh()
-//	}
 func (mw MainWindow) UpdateOnlineStatus(online bool, ps state.PlayStatus) {
 	if !online {
 		mw.StatusLine.Set("Offline. Waiting for connection...", 0)

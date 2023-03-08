@@ -18,6 +18,7 @@ var (
 	ctx         context.Context
 	Hw          *hw.HWInterface
 	State       *state.PlayerState
+	_           f2.Theme = (*myTheme)(nil)
 )
 
 func main() {
@@ -31,6 +32,7 @@ func main() {
 
 	fyneApp := app.New()
 	window := fyneApp.NewWindow("Remote Control Center")
+	fyneApp.Settings().SetTheme(&myTheme{})
 	window.Resize(f2.Size{Width: 300, Height: 600})
 
 	gui.Init(&window, stateStream, State, Hw)

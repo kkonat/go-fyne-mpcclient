@@ -2,7 +2,6 @@ package gui
 
 import (
 	"errors"
-	"fmt"
 	"remotecc/cmd/storage"
 	"strconv"
 	"strings"
@@ -59,10 +58,10 @@ func (t *SettingsTab) getGUI() *f2.Container {
 }
 
 func (t *SettingsTab) chngHWctrls(newVal bool) {
-	fmt.Println("chngHWctrls")
+
 	storage.AppSettings.ShowHWCtrl = newVal
-	MW.genTabs()
-	(*AppWindow).Content().Refresh()
+	MW.regenWindow()
+	MW.tabs.SelectIndex(len(MW.tabs.Items) - 1)
 }
 
 func (t *SettingsTab) extractAndSave() {
