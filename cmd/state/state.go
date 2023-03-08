@@ -82,7 +82,7 @@ func (ps *PlayerState) GetMPDStatus() {
 	if err != nil {
 		return
 	}
-	vol := TrackVolume(tryExtractInt(resp, "Volume:", int64(ps.Volume)))
+	vol := TrackVolume(tryExtractInt(resp, "volume:", int64(ps.Volume)))
 	if ps.Volume != vol {
 		ps.Volume = vol
 		ps.stateChange <- TrackVolume(vol)

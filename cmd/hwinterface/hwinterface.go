@@ -1,9 +1,12 @@
 package hwinterface
 
 import (
+	"fmt"
 	"remotecc/cmd/tcpclient"
 	"strings"
 )
+
+const DEBUG = false
 
 type HWInterface struct {
 	clients map[string]*tcpclient.Client
@@ -21,6 +24,13 @@ func NewHWInterface() *HWInterface {
 }
 
 func (hw *HWInterface) Request(server, command string) ([]string, error) {
+	if DEBUG {
+		switch command {
+		case "status", "currentsong", "check_extpower":
+		default:
+			fmt.Printf("Rrq [%s]: [%s]\n", server, command)
+		}
+	}
 	res, err := hw.clients[server].Request(command)
 	hw.Online = hw.clients["mpd"].Online // this one must be always online
 	return res, err

@@ -17,15 +17,14 @@ import (
 )
 
 type ControlCenterPanelGUI struct {
-	statusL              *canvas.Text
 	artist, album, track *canvas.Text
-	bPower               *widget.Button
+	muteButton           *widget.Button
+	slider               *widget.Slider
 	vol                  binding.Float
 	elapsed              binding.Float
 	lastVol              state.TrackVolume
 	volLastChngd         time.Time
 	prgrs                *fe.TappableProgressBar
-	storedStatusText     string
 	IPaddrs              binding.String
 	volPremut            int
 	muted                bool
@@ -43,48 +42,31 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 		artist:  fe.NewText("Artist:", 12),
 		album:   fe.NewText("Album:", 12),
 		track:   fe.NewText("Trk:", 12),
-		statusL: fe.NewText("Ready", 10),
 		vol:     binding.NewFloat(),
 		elapsed: binding.NewFloat(),
 		IPaddrs: binding.NewString(),
 		muted:   false,
 	}
 
+	initStatusText()
+
 	fe.NewText("Volume:", 10)
 	c.IPaddrs.Set("192.168.0.95:6600")
 
-	bInputPlayer := widget.NewButton("Player", func() {
-		c.SetStatusText("switched to Player", 3)
-		Hw.Request("ctrl", "deq_input_coaxial")
-	})
-
-	bInputTV := widget.NewButton("TV", func() {
-		c.SetStatusText("switched to TV", 3)
-		Hw.Request("ctrl", "deq_input_optical")
-	})
-
-	c.bPower = widget.NewButton("Power", func() {
-		c.TogglePower()
-	})
-
-	bShtDn := widget.NewButton("Shutdown", func() {
-		c.SetStatusText("Shutting down...", 0)
-		Hw.Request("ctrl", "server_poweroff")
-	})
-
-	slider := widget.NewSliderWithData(0, 100, c.vol)
-	slider.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
-	slider.Move(f2.NewPos(0, 20))
+	c.slider = widget.NewSliderWithData(0, 100, c.vol)
+	c.slider.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
+	c.slider.Move(f2.NewPos(0, 20))
 
 	c.lastVol = State.Volume
 	c.volLastChngd = time.Now()
 
 	// volume slider
 	// slider dragging
-	slider.OnChanged = func(val float64) {
+	c.slider.OnChanged = func(val float64) {
 		if time.Since(c.volLastChngd).Milliseconds() > 100 {
 			c.volLastChngd = time.Now()
 			v := int(val)
+			State.Volume = state.TrackVolume(v)
 			Hw.Request("mpd", fmt.Sprintf("setvol %d", v))
 		}
 	}
@@ -100,14 +82,15 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 		return state.TrkTimeToString(float32(c.prgrs.Value))
 	}
 
-	conPlayer :=
+	tabPlaylist := getTabPlaylist(Hw)
 
+	tabPlayer := container.NewMax(
 		container.NewVBox(
 			c.artist, c.album, c.track, c.prgrs,
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
 					Hw.Request("mpd", "previous")
-					c.SetStatusText("skip back", 1)
+					setStatusText("skip back", 1)
 				}),
 				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 					Hw.Request("mpd", "play")
@@ -120,95 +103,81 @@ func New(w f2.Window, stream chan any, State *state.PlayerState, Hw *hw.HWInterf
 				}),
 				widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
 					Hw.Request("mpd", "next")
-					c.SetStatusText("skip next", 1)
+					setStatusText("skip next", 1)
 				})),
-		)
-	conHW := container.NewVBox(container.NewGridWithColumns(2, bInputPlayer, bInputTV),
-		c.bPower,
-		bShtDn)
+			// widget.NewSeparator(),
+			widget.NewLabel("Playlist:"),
+			tabPlaylist),
+	)
 
-	conSettings :=
+	tabHW := getTabHW(Hw, State)
+
+	tabSettings :=
 		container.NewVBox(
 			widget.NewLabel("Settings"),
 			widget.NewSeparator(),
 			widget.NewLabel("IP:"),
 			widget.NewEntryWithData(c.IPaddrs))
 
+	treeData := map[string][]string{
+		"":          {"2015", "2016", "Playlisty"},
+		"2015":      {"Album 1", "Album 2"},
+		"2016":      {"Album 1", "Album 2"},
+		"Playlisty": {"Khruangbin Vibes", "Spotify PlOtW", "blabla", "blabla vibes", "blabla sounds"},
+		"Album 1":   {"Track 1", "Track 2"},
+	}
+	tabFilesTree := widget.NewTreeWithStrings(treeData)
+
 	tabs := container.NewAppTabs(
-		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), conPlayer),
-		container.NewTabItemWithIcon("", theme.ComputerIcon(), conHW),
-		container.NewTabItemWithIcon("", theme.SettingsIcon(), conSettings),
+		container.NewTabItemWithIcon("", theme.MediaPlayIcon(), tabPlayer),
+		container.NewTabItemWithIcon("", theme.StorageIcon(), tabPlaylist),
+		container.NewTabItemWithIcon("", theme.MediaMusicIcon(), tabFilesTree),
+		container.NewTabItemWithIcon("", theme.ComputerIcon(), tabHW),
+		container.NewTabItemWithIcon("", theme.SettingsIcon(), tabSettings),
 	)
 	tabs.SetTabLocation(container.TabLocationTop)
+
+	c.muteButton = widget.NewButtonWithIcon("", theme.VolumeMuteIcon(), func() {
+		if c.muted { //unmute
+			Hw.Request("mpd", fmt.Sprintf("setvol %d", c.volPremut))
+			c.muteButton.SetIcon(theme.VolumeMuteIcon())
+
+		} else {
+			c.volPremut = int(c.State.Volume)
+			Hw.Request("mpd", "setvol 15")
+			c.muteButton.SetIcon(theme.CancelIcon())
+		}
+		c.slider.SetValue(float64(c.State.Volume))
+		c.muted = !c.muted
+	})
+
 	w.SetContent(
-		container.NewBorder(nil, nil, nil, container.NewBorder(nil,
-			widget.NewButtonWithIcon("", theme.VolumeMuteIcon(), func() {
-				if c.muted {
-					Hw.Request("mpd", fmt.Sprintf("setvol %d", c.volPremut))
-				} else {
-					c.volPremut = int(c.State.Volume)
-				}
-				c.muted = !c.muted
-			}), nil, nil,
-			slider),
-			container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), c.statusL), nil, nil,
-				tabs)))
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			container.NewBorder(nil, c.muteButton, nil, nil, c.slider),                                      // R
+			container.NewBorder(nil, container.NewVBox(widget.NewSeparator(), statusLine), nil, nil, tabs))) // center
 
 	return c
 }
-func (c ControlCenterPanelGUI) UpdatePowerBbutton(powerOn bool) {
-	if powerOn {
-		c.bPower.SetText("Power off")
-	} else {
-		c.bPower.SetText("Power on")
-	}
-}
+
 func (c ControlCenterPanelGUI) UpdateOnlineStatus(online bool, ps state.PlayStatus) {
 	if !online {
-		c.SetStatusText("Offline. Waiting for connection...", 0)
+		setStatusText("Offline. Waiting for connection...", 0)
 	} else {
 		c.UpdatePlayStatus(ps)
 	}
 }
 
-func (c ControlCenterPanelGUI) TogglePower() {
-	var state bool
-	var err error
-	if err = c.Hw.TogglePower(); err == nil {
-		if state, err = c.State.GetHWState(); err == nil {
-			if state {
-				c.SetStatusText("powered off", 3)
-			} else {
-				c.SetStatusText("powered on", 3)
-			}
-			c.UpdatePowerBbutton(state)
-		}
-	}
-}
-func (c ControlCenterPanelGUI) SetStatusText(newText string, howLong int) {
-	if howLong == 0 {
-		c.statusL.Text = newText
-		c.statusL.Refresh()
-		return
-	}
-	c.storedStatusText = c.statusL.Text
-	c.statusL.Text = newText
-	time.AfterFunc(time.Second*time.Duration(howLong),
-		func() {
-			c.statusL.Text = c.storedStatusText
-			c.statusL.Refresh()
-		})
-	c.statusL.Refresh()
-}
-
 func (c *ControlCenterPanelGUI) UpdatePlayStatus(s state.PlayStatus) {
 	switch s {
 	case state.Playing:
-		c.SetStatusText("Playing...", 0)
+		setStatusText("Playing...", 0)
 	case state.Stopped:
-		c.SetStatusText("Stopped", 0)
+		setStatusText("Stopped", 0)
 	case state.Paused:
-		c.SetStatusText("Paused", 0)
+		setStatusText("Paused", 0)
 	}
 }
 func (c *ControlCenterPanelGUI) UpdateTrackDetails(ti *state.TrackInfo) {
@@ -228,4 +197,5 @@ func (c *ControlCenterPanelGUI) UpdateTrackElapsedTime(elTime state.TrackTime) {
 func (c *ControlCenterPanelGUI) UpdateVolume(v state.TrackVolume) {
 	c.vol.Set(float64(v))
 	c.lastVol = v
+	c.slider.SetValue(float64(v))
 }

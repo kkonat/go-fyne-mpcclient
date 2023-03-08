@@ -8,6 +8,7 @@ import (
 	hw "remotecc/cmd/hwinterface"
 	"remotecc/cmd/state"
 
+	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"golang.org/x/net/context"
 )
@@ -29,6 +30,7 @@ func main() {
 
 	fyneApp := app.New()
 	window := fyneApp.NewWindow("Remote Control Center")
+	window.Resize(f2.Size{Width: 300, Height: 600})
 
 	ccgui = gui.New(window, stateStream, State, Hw)
 
@@ -83,7 +85,7 @@ func HandleStateChanges() {
 				ccgui.UpdateTrackElapsedTime(newValue)
 
 			case state.PowerStatus:
-				ccgui.UpdatePowerBbutton(bool(newValue))
+				gui.UpdatePowerBbutton(bool(newValue))
 
 			case state.OnlineStatus:
 				ccgui.UpdateOnlineStatus(bool(newValue), State.Status)
