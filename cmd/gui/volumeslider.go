@@ -27,6 +27,7 @@ func NewVolumeSlider() *VolumeSlider {
 	vs.muted = false
 	vs.vol = binding.NewFloat()
 	vs.volSlider = widget.NewSliderWithData(0, 100, vs.vol)
+	// TODO:: add custom slider with drag capture, to hold slider ext updates whille being dragged
 	vs.volSlider.Orientation = widget.Orientation(f2.OrientationVerticalUpsideDown)
 	vs.volSlider.Move(f2.NewPos(0, 20))
 

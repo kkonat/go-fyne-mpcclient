@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const CONFIGFILE = "config.yml"
+const CONFIGFILE = "remotecc-config.yml"
 
 type ServerData struct {
 	IPAddr   string
@@ -35,6 +35,7 @@ func Init() {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to decode into struct, %v", err))
 	}
+	// TODO : add message box if there's no CONFIGFILE
 }
 
 func SaveData() error {
