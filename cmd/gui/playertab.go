@@ -17,8 +17,10 @@ type PlayerTab struct {
 	// gui components
 	artist, album, track *canvas.Text
 	prgrs                *fe.TappableProgressBar
+	timeButtonn          *widget.Button
 	// bindables
-	elapsed binding.Float
+	elapsed  binding.Float
+	timemode bool
 }
 
 func NewPlayerTab() *PlayerTab {
@@ -35,12 +37,18 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 	p.prgrs.OnTapped = p.prgrsBarTap
 	p.prgrs.Max = float64(State.Track.Duration)
 	p.prgrs.TextFormatter = func() string {
-		return state.TrkTimeToString(float32(p.prgrs.Value))
-	}
+		if p.timemode {
+			return "-" + state.TrkTimeToString(float32(float64(State.Track.Duration)-p.prgrs.Value))
+		} else {
+			return state.TrkTimeToString(float32(p.prgrs.Value))
+		}
 
+	}
+	p.timeButtonn = widget.NewButtonWithIcon("", theme.LogoutIcon(), p.tapTimeButton)
 	tabPlayer := container.NewMax(
 		container.NewVBox(
-			p.artist, p.album, p.track, p.prgrs,
+			p.artist, p.album, p.track,
+			container.NewBorder(nil, nil, nil, p.timeButtonn, p.prgrs),
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
 					Hw.Request("mpd", "previous")
@@ -63,7 +71,16 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 		))
 	return tabPlayer
 }
-
+func (p *PlayerTab) tapTimeButton() {
+	p.timemode = !p.timemode
+	var icon fyne.Resource
+	if p.timemode {
+		icon = theme.LoginIcon()
+	} else {
+		icon = theme.LogoutIcon()
+	}
+	p.timeButtonn.SetIcon(icon)
+}
 func (p *PlayerTab) prgrsBarTap(percentPos float64) {
 	seekTo := float64(State.Track.Duration) * percentPos
 	song := State.Track.Song
