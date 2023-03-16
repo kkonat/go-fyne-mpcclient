@@ -28,6 +28,9 @@ func NewPlayerTab() *PlayerTab {
 }
 
 func (p *PlayerTab) getGUI() *fyne.Container {
+	image := canvas.NewImageFromFile("./albumart/mbid-7f368303-f564-43bb-ae16-86edf99bd87b-34204952159_thumb250.jpg")
+	image.FillMode = canvas.ImageFillOriginal
+
 	p.artist = fe.NewText("Artist:", 12)
 	p.album = fe.NewText("Album:", 12)
 	p.track = fe.NewText("Trk:", 12)
@@ -67,7 +70,8 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 					Hw.Request("mpd", "next")
 					MW.StatusLine.Set("skip next", 1)
 				})),
-			// widget.NewSeparator(),
+			widget.NewSeparator(),
+			image,
 		))
 	return tabPlayer
 }

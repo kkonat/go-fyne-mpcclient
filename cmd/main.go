@@ -33,7 +33,7 @@ func main() {
 	fyneApp := app.New()
 	window := fyneApp.NewWindow("Remote Control Center")
 	fyneApp.Settings().SetTheme(&myTheme{})
-	window.Resize(f2.Size{Width: 300, Height: 600})
+	window.Resize(f2.Size{Width: 300, Height: 500})
 
 	gui.Init(&window, stateStream, State, Hw)
 
