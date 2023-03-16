@@ -3,12 +3,14 @@ package gui
 import (
 	"fmt"
 	fe "remotecc/cmd/fynextensions"
+	"remotecc/cmd/musicbrainz"
 	"remotecc/cmd/state"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -18,6 +20,7 @@ type PlayerTab struct {
 	artist, album, track *canvas.Text
 	prgrs                *fe.TappableProgressBar
 	timeButtonn          *widget.Button
+	image                *canvas.Image
 	// bindables
 	elapsed  binding.Float
 	timemode bool
@@ -28,8 +31,8 @@ func NewPlayerTab() *PlayerTab {
 }
 
 func (p *PlayerTab) getGUI() *fyne.Container {
-	image := canvas.NewImageFromFile("./albumart/mbid-7f368303-f564-43bb-ae16-86edf99bd87b-34204952159_thumb250.jpg")
-	image.FillMode = canvas.ImageFillOriginal
+	p.image = canvas.NewImageFromFile("coverart.jpg")
+	p.image.FillMode = canvas.ImageFillOriginal
 
 	p.artist = fe.NewText("Artist:", 12)
 	p.album = fe.NewText("Album:", 12)
@@ -49,8 +52,9 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 	}
 	p.timeButtonn = widget.NewButtonWithIcon("", theme.LogoutIcon(), p.tapTimeButton)
 	tabPlayer := container.NewMax(
-		container.NewVBox(
-			p.artist, p.album, p.track,
+		container.NewVBox(container.New(layout.NewCenterLayout(),
+			p.image,
+		), p.artist, p.album, p.track,
 			container.NewBorder(nil, nil, nil, p.timeButtonn, p.prgrs),
 			container.NewGridWithColumns(5,
 				widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
@@ -70,8 +74,7 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 					Hw.Request("mpd", "next")
 					MW.StatusLine.Set("skip next", 1)
 				})),
-			widget.NewSeparator(),
-			image,
+			// widget.NewSeparator(),
 		))
 	return tabPlayer
 }
@@ -99,6 +102,14 @@ func (p *PlayerTab) UpdateTrackDetails(ti *state.TrackInfo) {
 	p.artist.Refresh()
 	p.track.Refresh()
 	p.prgrs.Max = float64(ti.Duration)
+	if musicbrainz.GetCoverArt(ti.Album, ti.Artist) {
+		p.image = canvas.NewImageFromFile("coverart.jpg")
+		p.image.Show()
+
+	} else {
+		p.image.Hide()
+	}
+	canvas.Refresh(p.image)
 }
 
 func (p *PlayerTab) UpdateTrackElapsedTime(elTime state.TrackTime) {

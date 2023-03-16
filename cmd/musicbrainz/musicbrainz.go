@@ -3,7 +3,6 @@ package musicbrainz
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -116,11 +115,14 @@ func queryCover(releaseId string) (string, error) {
 	if res.StatusCode == http.StatusOK {
 		r = CoverResp{}
 		json.NewDecoder(res.Body).Decode(&r)
-		for _, img := range r.Images {
-			fmt.Printf("%v\n", img.Thumbnails.Num250)
-		}
+		// for _, img := range r.Images {
+		// 	fmt.Printf("%v\n", img.Thumbnails.Num250)
+		// }
 	}
 	var img string
+	if len(r.Images) == 0 {
+		return "", errors.New("no images")
+	}
 	if r.Images[0].Thumbnails.Num250 != "" {
 		img = r.Images[0].Thumbnails.Num250
 	} else if r.Images[0].Thumbnails.Small != "" {
@@ -154,19 +156,11 @@ func queryRelease(album string, artist string) (id string, err error) {
 	// var bodyBytes []byte
 	var r ReleasesResp
 	if res.StatusCode == http.StatusOK {
-		// bodyBytes, err = io.ReadAll(res.Body)
-		// if err != nil {
-		// 	return
-		// }
-		// bodyString := string(bodyBytes)
-		// fmt.Println(bodyString)
-		// log.Info(bodyString)
-
 		r = ReleasesResp{}
 		json.NewDecoder(res.Body).Decode(&r)
-		for _, rel := range r.Releases {
-			fmt.Printf("%v\n", rel.ID)
-		}
+		// for _, rel := range r.Releases {
+		// 	fmt.Printf("%v\n", rel.ID)
+		// }
 	}
 	return r.Releases[0].ID, nil
 }
@@ -196,4 +190,20 @@ func downloadFile(URL, fileName string) error {
 	}
 
 	return nil
+}
+
+func GetCoverArt(album string, artist string) bool {
+	id, err := queryRelease(album, artist)
+	if err != nil {
+		return false
+	}
+	coverUrl, err := queryCover(id)
+	if err != nil {
+		return false
+	}
+	// file := ""
+	// err, file = path.Split(coverUrl)
+	// downloadFile(coverUrl, file)
+	downloadFile(coverUrl, "coverart.jpg")
+	return true
 }

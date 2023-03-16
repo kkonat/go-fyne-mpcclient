@@ -11,6 +11,7 @@ import (
 
 	f2 "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 )
 
 var (
@@ -78,6 +79,7 @@ func HandleStateChanges() {
 
 			case state.TrackInfo:
 				gui.MW.PlayerTab.UpdateTrackDetails(&newValue)
+				canvas.Refresh((*gui.AppWindow).Canvas().Content())
 
 			case state.TrackVolume:
 				gui.MW.VolSlider.UpdateVolume(newValue)
