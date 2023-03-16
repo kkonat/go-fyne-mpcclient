@@ -21,6 +21,7 @@ type PlayerTab struct {
 	prgrs                *fe.TappableProgressBar
 	timeButtonn          *widget.Button
 	image                *canvas.Image
+	tab                  *fyne.Container
 	// bindables
 	elapsed  binding.Float
 	timemode bool
@@ -51,7 +52,7 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 
 	}
 	p.timeButtonn = widget.NewButtonWithIcon("", theme.LogoutIcon(), p.tapTimeButton)
-	tabPlayer := container.NewMax(
+	p.tab = container.NewMax(
 		container.NewVBox(container.New(layout.NewCenterLayout(),
 			p.image,
 		), p.artist, p.album, p.track,
@@ -76,7 +77,7 @@ func (p *PlayerTab) getGUI() *fyne.Container {
 				})),
 			// widget.NewSeparator(),
 		))
-	return tabPlayer
+	return p.tab
 }
 func (p *PlayerTab) tapTimeButton() {
 	p.timemode = !p.timemode
@@ -101,15 +102,18 @@ func (p *PlayerTab) UpdateTrackDetails(ti *state.TrackInfo) {
 	p.album.Refresh()
 	p.artist.Refresh()
 	p.track.Refresh()
+
 	p.prgrs.Max = float64(ti.Duration)
+
 	if musicbrainz.GetCoverArt(ti.Album, ti.Artist) {
 		p.image = canvas.NewImageFromFile("coverart.jpg")
-		p.image.Show()
-
 	} else {
-		p.image.Hide()
+		p.image = canvas.NewImageFromFile("blank.jpg")
+		fmt.Println("blank")
+		canvas.Refresh((*AppWindow).Canvas().Content())
 	}
-	canvas.Refresh(p.image)
+	//fmt.Println(p.image.File)
+	//canvas.Refresh(p.tab)
 }
 
 func (p *PlayerTab) UpdateTrackElapsedTime(elTime state.TrackTime) {
