@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"remotecc/cmd/coverart"
 	hw "remotecc/cmd/hwinterface"
 	"remotecc/cmd/state"
 	"remotecc/cmd/storage"
@@ -28,11 +29,12 @@ type MainWindow struct {
 // references to all GUI components
 // declared global so they do not need to be passed to each GUI element
 var (
-	Hw          *hw.HWInterface
-	State       *state.PlayerState
-	stateStream chan any
-	MW          *MainWindow
-	AppWindow   *f2.Window
+	Hw              *hw.HWInterface
+	State           *state.PlayerState
+	stateStream     chan any
+	MW              *MainWindow
+	AppWindow       *f2.Window
+	CvArtDownloader *coverart.Downloader
 )
 
 func NewMainWindow() *MainWindow {
@@ -46,6 +48,9 @@ func Init(w *f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface
 	State = s
 	Hw = h
 	stateStream = stream
+
+	CvArtDownloader = coverart.NewDownloader()
+	CvArtDownloader.Register(coverart.SourceMusicBrainz{})
 
 	MW = NewMainWindow()
 

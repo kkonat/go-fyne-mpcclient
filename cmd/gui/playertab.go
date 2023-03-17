@@ -3,7 +3,6 @@ package gui
 import (
 	"fmt"
 	fe "remotecc/cmd/fynextensions"
-	"remotecc/cmd/musicbrainz"
 	"remotecc/cmd/state"
 
 	"fyne.io/fyne/v2"
@@ -105,15 +104,12 @@ func (p *PlayerTab) UpdateTrackDetails(ti *state.TrackInfo) {
 
 	p.prgrs.Max = float64(ti.Duration)
 
-	if musicbrainz.GetCoverArt(ti.Album, ti.Artist) {
-		p.image = canvas.NewImageFromFile("coverart.jpg")
+	if CvArtDownloader.TryDownloadCoverArt(ti.Album, ti.Artist) {
+		p.image.File = "coverart.jpg"
 	} else {
-		p.image = canvas.NewImageFromFile("blank.jpg")
-		fmt.Println("blank")
-		canvas.Refresh((*AppWindow).Canvas().Content())
+		p.image.File = "blank.jpg"
 	}
-	//fmt.Println(p.image.File)
-	//canvas.Refresh(p.tab)
+	p.image.Refresh()
 }
 
 func (p *PlayerTab) UpdateTrackElapsedTime(elTime state.TrackTime) {

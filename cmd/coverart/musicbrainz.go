@@ -1,17 +1,15 @@
-package musicbrainz
+package coverart
 
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
 // Transformed using: https://transform.tools/json-to-go
-type ReleasesResp struct {
+type MBReleasesResp struct {
 	Created  time.Time `json:"created"`
 	Count    int       `json:"count"`
 	Offset   int       `json:"offset"`
@@ -71,7 +69,7 @@ type ReleasesResp struct {
 	} `json:"releases"`
 }
 
-type CoverResp struct {
+type MBCoverResp struct {
 	Images []struct {
 		Approved   bool   `json:"approved"`
 		Back       bool   `json:"back"`
@@ -92,28 +90,55 @@ type CoverResp struct {
 	Release string `json:"release"`
 }
 
-const ReleaseQueryURL = `https://musicbrainz.org/ws/2/release/?query=`
-const CoverQueryURL = `http://coverartarchive.org/release/`
+type SourceMusicBrainz struct {
+	releaseId string
+}
 
-func queryCover(releaseId string) (string, error) {
-	request := CoverQueryURL + releaseId
+func (cas SourceMusicBrainz) DownloadCoverArt(album string, artist string) bool {
+	if album == "" && artist == "" {
+		return false
+	}
+	err := cas.queryRelease(album, artist)
+	if err != nil {
+		return false
+	}
+	coverUrl, err := cas.queryCover()
+	if err != nil {
+		return false
+	}
+	if err = downloadFile(coverUrl, "coverart.jpg"); err != nil {
+		return false
+	}
+	return true
+}
+
+func (cas *SourceMusicBrainz) queryCover() (string, error) {
+	const MBCoverQueryURL = `http://coverartarchive.org/release/`
+	var err error
+	if cas.releaseId == "" {
+		return "", errors.New("invalid release")
+	}
+	request := MBCoverQueryURL + cas.releaseId
+
 	client := http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", request, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header = http.Header{
-		"Accept": {"application/json"},
+		"Accept":     {"application/json"},
+		"User-Agent": Headers["User-Agent"],
 	}
+
 	res, err := client.Do(req)
 
 	if err != nil {
 		return "", err
 	}
 	defer res.Body.Close()
-	var r CoverResp
+	var r MBCoverResp
 	if res.StatusCode == http.StatusOK {
-		r = CoverResp{}
+		r = MBCoverResp{}
 		json.NewDecoder(res.Body).Decode(&r)
 		// for _, img := range r.Images {
 		// 	fmt.Printf("%v\n", img.Thumbnails.Num250)
@@ -130,17 +155,20 @@ func queryCover(releaseId string) (string, error) {
 	}
 	return img, nil
 }
-func queryRelease(album string, artist string) (id string, err error) {
+
+func (cas *SourceMusicBrainz) queryRelease(album string, artist string) (err error) {
+
+	const MBReleaseQueryURL = `https://musicbrainz.org/ws/2/release/?query=`
 
 	artist = strings.Replace(artist, " ", "%20", -1)
 	album = strings.Replace(album, " ", "%20", -1)
 
-	request := ReleaseQueryURL + album + "%20AND%20artist:" + artist
+	request := MBReleaseQueryURL + album + "%20AND%20artist:" + artist
 
 	client := http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", request, nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	req.Header = http.Header{
@@ -150,60 +178,18 @@ func queryRelease(album string, artist string) (id string, err error) {
 	res, err := client.Do(req)
 
 	if err != nil {
-		return
+		return err
 	}
 	defer res.Body.Close()
-	// var bodyBytes []byte
-	var r ReleasesResp
+
+	var r MBReleasesResp
 	if res.StatusCode == http.StatusOK {
-		r = ReleasesResp{}
+		r = MBReleasesResp{}
 		json.NewDecoder(res.Body).Decode(&r)
 		// for _, rel := range r.Releases {
 		// 	fmt.Printf("%v\n", rel.ID)
 		// }
 	}
-	return r.Releases[0].ID, nil
-}
-
-func downloadFile(URL, fileName string) error {
-	//Get the response bytes from the url
-	response, err := http.Get(URL)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		return errors.New("Received non 200 response code")
-	}
-	//Create a empty file
-	file, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	//Write the bytes to the fiel
-	_, err = io.Copy(file, response.Body)
-	if err != nil {
-		return err
-	}
-
+	cas.releaseId = r.Releases[0].ID
 	return nil
-}
-
-func GetCoverArt(album string, artist string) bool {
-	id, err := queryRelease(album, artist)
-	if err != nil {
-		return false
-	}
-	coverUrl, err := queryCover(id)
-	if err != nil {
-		return false
-	}
-	// file := ""
-	// err, file = path.Split(coverUrl)
-	// downloadFile(coverUrl, file)
-	downloadFile(coverUrl, "coverart.jpg")
-	return true
 }
