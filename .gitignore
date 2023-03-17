@@ -1,4 +1,4 @@
 *.exe
 ..\cmd\bin
-*.jpg
+# *.jpg
 lastfm-config.yml
