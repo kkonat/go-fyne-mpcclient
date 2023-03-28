@@ -52,6 +52,12 @@ func Init(w *f2.Window, stream chan any, s *state.PlayerState, h *hw.HWInterface
 	CvArtDownloader = coverart.NewDownloader()
 	CvArtDownloader.Register(coverart.SourceMusicBrainz{})
 
+	lfmsrc, err := coverart.NewSourceLastFm()
+	if err != nil {
+		panic(err)
+	}
+	CvArtDownloader.Register(*lfmsrc)
+
 	MW = NewMainWindow()
 
 	// Create complex controls

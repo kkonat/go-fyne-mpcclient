@@ -36,7 +36,7 @@ func Init() {
 		panic(fmt.Sprintf("Unable to decode into struct, %v", err))
 	}
 	// TODO : add message box if there's no CONFIGFILE
-	
+
 }
 
 func SaveData() error {
