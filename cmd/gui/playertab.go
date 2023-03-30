@@ -2,6 +2,7 @@ package gui
 
 import (
 	"fmt"
+	"remotecc/cmd/coverart"
 	fe "remotecc/cmd/fynextensions"
 	"remotecc/cmd/state"
 
@@ -31,7 +32,7 @@ func NewPlayerTab() *PlayerTab {
 }
 
 func (p *PlayerTab) getGUI() *fyne.Container {
-	p.image = canvas.NewImageFromFile("coverart.jpg")
+	p.image = canvas.NewImageFromFile("")
 	p.image.FillMode = canvas.ImageFillOriginal
 
 	p.artist = fe.NewText("Artist:", 12)
@@ -105,7 +106,7 @@ func (p *PlayerTab) UpdateTrackDetails(ti *state.TrackInfo) {
 	p.prgrs.Max = float64(ti.Duration)
 
 	if CvArtDownloader.TryDownloadCoverArt(ti.Album, ti.Artist) {
-		p.image.File = "coverart.jpg"
+		p.image.File = coverart.CoverArtFile
 	} else {
 		p.image.File = "blank.jpg"
 	}

@@ -1,6 +1,14 @@
 package coverart
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
+	"time"
+)
 
 type itunesResp struct {
 	ResultCount int `json:"resultCount"`
@@ -31,7 +39,45 @@ type itunesResp struct {
 type ITunesCASource struct {
 }
 
-// func (itcs *ITunesCASource) DownloadCoverArt(album string, artist string) bool {
+func NewSourceItunes() *ITunesCASource {
+	return &ITunesCASource{}
+}
 
-// https://itunes.apple.com/search?term=Broke&entity=album&artist=Scott+Lavene&media=music&limit=1
-// }
+func (its *ITunesCASource) GetServiceName() string {
+	return "iTunes"
+}
+func (its *ITunesCASource) DownloadCoverArt(album string, artist string) bool {
+	// https://itunes.apple.com/search?term=Broke&entity=album&artist=Scott+Lavene&media=music&limit=1
+
+	request := `https://itunes.apple.com/search?term=` + url.PathEscape(album) + `&entity=album&artist=` + url.PathEscape(artist) + `&media=music&limit=1`
+
+	client := http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", request, nil)
+	if err != nil {
+		return false
+	}
+	req.Header = http.Header{
+		"Accept":     {"application/json"},
+		"User-Agent": Headers["User-Agent"],
+	}
+
+	res, err := client.Do(req)
+
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+
+	var itResp itunesResp
+	if res.StatusCode == http.StatusOK {
+		itResp = itunesResp{}
+		json.NewDecoder(res.Body).Decode(&itResp)
+	} else {
+		log.Fatal(res.Status)
+		body, _ := ioutil.ReadAll(res.Body)
+		fmt.Printf("request response Error: %v %v", res.Status, res.Body)
+		log.Fatal(string(body))
+	}
+	downloadFile(itResp.Results[0].ArtworkURL100, CoverArtFile)
+	return true
+}

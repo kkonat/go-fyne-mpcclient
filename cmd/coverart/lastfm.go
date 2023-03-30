@@ -60,7 +60,7 @@ type SourceLastFm struct {
 	apiKey string `yaml:"apiKey"`
 }
 
-func NewSourceLastFm() (*SourceLastFm, error) {
+func NewSourceLastFm() *SourceLastFm {
 	const file = "lastfm-config.yml"
 
 	lfms := new(SourceLastFm)
@@ -68,8 +68,7 @@ func NewSourceLastFm() (*SourceLastFm, error) {
 
 	workingdir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
-		panic(err)
+		panic(fmt.Sprintf("error geting working dir %s", err))
 	}
 	viper.SetConfigName(file)
 	viper.AddConfigPath(workingdir)
@@ -84,11 +83,14 @@ func NewSourceLastFm() (*SourceLastFm, error) {
 	}
 	lfms.apiKey = lfmconf.ApiKey
 
-	return lfms, nil
+	return lfms
 }
 
-// http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=APIKEYAPIKEYAPIKEY&artist=Scott Lavene&album=Broke&format=json
-func (cas SourceLastFm) DownloadCoverArt(album string, artist string) bool {
+func (cas *SourceLastFm) GetServiceName() string {
+	return "LastFm"
+}
+
+func (cas *SourceLastFm) DownloadCoverArt(album string, artist string) bool {
 	if album == "" && artist == "" {
 		return false
 	}
@@ -96,6 +98,8 @@ func (cas SourceLastFm) DownloadCoverArt(album string, artist string) bool {
 	return err == nil
 }
 func (cas SourceLastFm) queryCover(album string, artist string) (string, error) {
+	// Sample request
+	// http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=APIKEYAPIKEYAPIKEY&artist=Scott Lavene&album=Broke&format=json
 	request := `http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=` + cas.apiKey + `&artist=` + url.QueryEscape(artist) + `&album=` + url.QueryEscape(album) + `&format=json`
 
 	client := http.Client{Timeout: 10 * time.Second}
@@ -128,7 +132,7 @@ func (cas SourceLastFm) queryCover(album string, artist string) (string, error) 
 	images := lfmResp.Album.Image
 	for _, image := range images {
 		if image.Size == "large" {
-			downloadFile(image.Text, "coverart.jpg")
+			downloadFile(image.Text, CoverArtFile)
 			return image.Text, nil
 		}
 	}

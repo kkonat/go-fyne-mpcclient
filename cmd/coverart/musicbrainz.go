@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 )
 
@@ -94,27 +94,37 @@ type SourceMusicBrainz struct {
 	releaseId string
 }
 
-func (cas SourceMusicBrainz) DownloadCoverArt(album string, artist string) bool {
+func NewSourceMusicBrainz() *SourceMusicBrainz {
+	return &SourceMusicBrainz{}
+}
+
+func (smb *SourceMusicBrainz) GetServiceName() string {
+	return "MusicBrainz"
+}
+
+func (smb *SourceMusicBrainz) DownloadCoverArt(album string, artist string) (ok bool) {
 	if album == "" && artist == "" {
-		return false
+		return
 	}
-	err := cas.queryRelease(album, artist)
+	err := smb.queryRelease(album, artist)
 	if err != nil {
-		return false
+		return
 	}
-	coverUrl, err := cas.queryCover()
+	coverUrl, err := smb.queryCover()
 	if err != nil {
-		return false
+		return
 	}
-	if err = downloadFile(coverUrl, "coverart.jpg"); err != nil {
-		return false
+	if err = downloadFile(coverUrl, CoverArtFile); err != nil {
+		return
 	}
-	return true
+	ok = true
+	return
 }
 
 func (cas *SourceMusicBrainz) queryCover() (string, error) {
 	const MBCoverQueryURL = `http://coverartarchive.org/release/`
 	var err error
+
 	if cas.releaseId == "" {
 		return "", errors.New("invalid release")
 	}
@@ -140,9 +150,6 @@ func (cas *SourceMusicBrainz) queryCover() (string, error) {
 	if res.StatusCode == http.StatusOK {
 		r = MBCoverResp{}
 		json.NewDecoder(res.Body).Decode(&r)
-		// for _, img := range r.Images {
-		// 	fmt.Printf("%v\n", img.Thumbnails.Num250)
-		// }
 	}
 	var img string
 	if len(r.Images) == 0 {
@@ -158,12 +165,7 @@ func (cas *SourceMusicBrainz) queryCover() (string, error) {
 
 func (cas *SourceMusicBrainz) queryRelease(album string, artist string) (err error) {
 
-	const MBReleaseQueryURL = `https://musicbrainz.org/ws/2/release/?query=`
-
-	artist = strings.Replace(artist, " ", "%20", -1)
-	album = strings.Replace(album, " ", "%20", -1)
-
-	request := MBReleaseQueryURL + album + "%20AND%20artist:" + artist
+	request := `https://musicbrainz.org/ws/2/release/?query=` + url.QueryEscape(album) + "%20AND%20artist:" + url.QueryEscape(artist)
 
 	client := http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", request, nil)
@@ -183,13 +185,12 @@ func (cas *SourceMusicBrainz) queryRelease(album string, artist string) (err err
 	defer res.Body.Close()
 
 	var r MBReleasesResp
+
 	if res.StatusCode == http.StatusOK {
 		r = MBReleasesResp{}
 		json.NewDecoder(res.Body).Decode(&r)
-		// for _, rel := range r.Releases {
-		// 	fmt.Printf("%v\n", rel.ID)
-		// }
 	}
+
 	cas.releaseId = r.Releases[0].ID
 	return nil
 }

@@ -2,15 +2,19 @@ package coverart
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 )
 
+const CoverArtFile = "coverart.jpg"
+
 var Headers map[string][]string = map[string][]string{"User-Agent": {"RemoteCC/1.2.0 ( mieczotronix@poczta.onet.pl )"}}
 
 type CASource interface {
 	DownloadCoverArt(album string, artist string) bool
+	GetServiceName() string
 }
 type Downloader struct {
 	sources []*CASource
@@ -21,21 +25,15 @@ func NewDownloader() *Downloader {
 	c.sources = make([]*CASource, 0)
 	return c
 }
-func (cd *Downloader) Register(downloader CASource) {
+func (cd *Downloader) RegisterService(downloader CASource) {
 	cd.sources = append(cd.sources, &downloader)
 }
 
 func (cd *Downloader) TryDownloadCoverArt(album string, artist string) bool {
 	// src := "not found"
 	for _, cs := range cd.sources {
-		// switch (*cs).(type) {
-		// case SourceLastFm:
-		// 	src = "LastFM"
-		// case SourceMusicBrainz:
-		// 	src = "MusicBrainz"
-		// }
 		if (*cs).DownloadCoverArt(album, artist) {
-			// fmt.Printf("Downloaded cover art for %s - %s from %s\n", artist, album, src)
+			fmt.Printf("Downloaded cover art for %s - %s from %s\n", artist, album, (*cs).GetServiceName())
 			return true
 		}
 	}
@@ -53,7 +51,8 @@ func downloadFile(URL, fileName string) error {
 	if response.StatusCode != 200 {
 		return errors.New("Received non 200 response code")
 	}
-	//Create a empty file
+
+	//Create an empty file
 	file, err := os.Create(fileName)
 	if err != nil {
 		return err
